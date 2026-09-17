@@ -7,7 +7,6 @@
 
 [![CI](https://github.com/zackmsa777-a11y/rustfetch/actions/workflows/ci.yml/badge.svg)](https://github.com/zackmsa777-a11y/rustfetch/actions/workflows/ci.yml)
 [![Release](https://github.com/zackmsa777-a11y/rustfetch/actions/workflows/release.yml/badge.svg)](https://github.com/zackmsa777-a11y/rustfetch/releases)
-[![Crates.io](https://img.shields.io/badge/crates.io-v0.1.0-orange.svg)](https://crates.io/crates/rustfetch)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 [![Rust: 2021 Edition](https://img.shields.io/badge/Rust-2021%20Edition-red.svg)](https://www.rust-lang.org/)
 [![Author](https://img.shields.io/badge/author-zackmsa777--a11y-purple.svg)](https://github.com/zackmsa777-a11y)
@@ -67,40 +66,28 @@ Measured on a standard Linux workstation (average of 50 runs):
 
 ## Installation
 
-### Cargo (Recommended)
+### Cargo via Git (Recommended)
 
 ```bash
-cargo install rustfetch
+cargo install --git https://github.com/zackmsa777-a11y/rustfetch.git
 ```
 
-### Prebuilt Binary (Linux x86_64 / ARM64 / macOS / Windows)
+### Prebuilt Binary (Linux x86_64)
 
-Download the latest release archive from [GitHub Releases](https://github.com/zackmsa777-a11y/rustfetch/releases/latest):
+Download and install the official binary release:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/zackmsa777-a11y/rustfetch/master/install.sh | bash
 ```
 
-Or manually extract and place the binary in your `$PATH`:
-
-```bash
-tar -xzvf rustfetch-v0.1.0-x86_64-unknown-linux-musl.tar.gz
-sudo mv rustfetch /usr/local/bin/
-```
-
-### Arch Linux (AUR)
-
-```bash
-yay -S rustfetch-bin
-```
+Or download directly from [GitHub Releases](https://github.com/zackmsa777-a11y/rustfetch/releases/latest).
 
 ### Build from Source
 
 ```bash
 git clone https://github.com/zackmsa777-a11y/rustfetch.git
 cd rustfetch
-cargo build --release
-sudo install -m 755 target/release/rustfetch /usr/local/bin/
+cargo install --path .
 ```
 
 ---
