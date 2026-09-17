@@ -3,6 +3,7 @@ mod config;
 mod info;
 mod logos;
 mod printer;
+mod tui;
 mod utils;
 
 use cli::{parse_cli, print_help, print_modules};
@@ -50,24 +51,21 @@ fn main() {
         return;
     }
 
+    let mut file_cfg = load_config(cli_opts.config_path.as_deref());
+
     if cli_opts.list_themes {
         println!("Available rustfetch themes:");
-        for (name, fields) in config::THEME_PRESETS {
-            let desc: Vec<String> = fields
-                .iter()
-                .filter(|(_, v)| !v.is_empty())
-                .map(|(k, v)| format!("{k}={v}"))
-                .collect();
-            if desc.is_empty() {
-                println!("  - {name} (distro default colors)");
-            } else {
-                println!("  - {name} ({})", desc.join(", "));
-            }
+        for name in config::all_theme_names(&file_cfg) {
+            let colors = config::lookup_theme(&file_cfg, &name).unwrap_or_default();
+            println!("  - {}", tui::describe(&name, &colors));
         }
+        println!("\nCustom themes: add a `themes` map to your config:");
+        println!(
+            "  \"themes\": {{ \"my-theme\": {{ \"keys\": \"cyan\", \"value\": \"white\" }} }}"
+        );
+        println!("Then `rustfetch --theme my-theme`, `--preview-themes`, or `--themes`.");
         return;
     }
-
-    let file_cfg = load_config(cli_opts.config_path.as_deref());
 
     let cfg_logo_name = file_cfg.get_logo_name();
     let cfg_logo_color = file_cfg.get_logo_color();
@@ -79,10 +77,6 @@ fn main() {
         .logo
         .as_deref()
         .or_else(|| cfg_logo_name.as_deref().filter(|s| *s != "auto"));
-    let effective_logo_color = cli_opts
-        .logo_color
-        .as_deref()
-        .or_else(|| cfg_logo_color.as_deref().filter(|s| *s != "auto"));
     let effective_structure = cli_opts.structure.as_ref().or(cfg_modules.as_ref());
 
     let effective_disks = cli_opts
@@ -92,35 +86,83 @@ fn main() {
 
     let system_info = gather_info(effective_disks.map(|v| v.as_slice()));
 
-    let cfg_key_color = file_cfg.get_key_color();
-    let theme = file_cfg.theme.as_ref();
-    let theme_colors = theme
-        .as_ref()
-        .and_then(|t| t.name.as_deref())
-        .and_then(config::resolve_theme);
+    if cli_opts.preview_themes {
+        tui::preview_all(
+            &system_info,
+            &file_cfg,
+            effective_no_color,
+            effective_no_logo,
+            effective_logo,
+        );
+        return;
+    }
 
-    let keys_raw = theme
-        .and_then(|t| t.keys.as_deref())
-        .or_else(|| theme_colors.as_ref().and_then(|c| c.keys.as_deref()))
+    if cli_opts.theme_picker {
+        if let Err(e) = tui::run_picker(
+            &system_info,
+            &file_cfg,
+            cli_opts.config_path.as_deref(),
+            effective_no_logo,
+            effective_logo,
+        ) {
+            eprintln!("error: {e}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
+    // `--set-theme` persists first, then renders with the new theme below.
+    if let Some(name) = cli_opts.set_theme.clone() {
+        if config::lookup_theme(&file_cfg, &name).is_none() {
+            eprintln!("error: unknown theme '{name}' (see --list-themes)");
+            std::process::exit(1);
+        }
+        match config::save_theme_name(cli_opts.config_path.as_deref(), &name) {
+            Ok(saved) => {
+                eprintln!("Saved theme '{name}' to {}", saved.display());
+                file_cfg = load_config(cli_opts.config_path.as_deref());
+            }
+            Err(e) => {
+                eprintln!("error saving theme: {e}");
+                std::process::exit(1);
+            }
+        }
+    }
+
+    if let Some(name) = cli_opts.theme.as_deref()
+        && config::lookup_theme(&file_cfg, name).is_none()
+    {
+        eprintln!("error: unknown theme '{name}' (see --list-themes)");
+        std::process::exit(1);
+    }
+
+    // Theme resolution order: --theme flag > config theme (+ custom themes
+    // override built-in presets of the same name) > legacy display colors.
+    let merged: config::ThemeColors = if let Some(name) = cli_opts.theme.as_deref() {
+        config::lookup_theme(&file_cfg, name).unwrap_or_default()
+    } else {
+        config::active_theme(&file_cfg).1
+    };
+
+    let cfg_key_color = file_cfg.get_key_color();
+    let keys_raw = merged
+        .keys
+        .as_deref()
         .or(cfg_key_color.as_deref())
         .filter(|s| *s != "auto");
-    let title_raw = theme
-        .and_then(|t| t.title.as_deref())
-        .or_else(|| theme_colors.as_ref().and_then(|c| c.title.as_deref()))
-        .filter(|s| *s != "auto");
-    let value_raw = theme
-        .and_then(|t| t.value.as_deref())
-        .or_else(|| theme_colors.as_ref().and_then(|c| c.value.as_deref()))
-        .filter(|s| *s != "auto");
-    let separator_raw = theme
-        .and_then(|t| t.separator.as_deref())
-        .or_else(|| theme_colors.as_ref().and_then(|c| c.separator.as_deref()))
-        .or_else(|| {
-            file_cfg
-                .display
-                .as_ref()
-                .and_then(|d| d.separator.as_deref())
-        });
+    let title_raw = merged.title.as_deref().filter(|s| *s != "auto");
+    let value_raw = merged.value.as_deref().filter(|s| *s != "auto");
+    let separator_raw = merged.separator.as_deref().or_else(|| {
+        file_cfg
+            .display
+            .as_ref()
+            .and_then(|d| d.separator.as_deref())
+    });
+    let effective_logo_color = cli_opts
+        .logo_color
+        .as_deref()
+        .or(merged.logo_color.as_deref())
+        .or_else(|| cfg_logo_color.as_deref().filter(|s| *s != "auto"));
 
     let print_opts = PrintOptions {
         no_color: effective_no_color,
@@ -294,10 +336,23 @@ mod tests {
         }"##;
         let cfg: Config = serde_json::from_str(json_str).unwrap();
         let theme = cfg.theme.unwrap();
-        assert_eq!(theme.name.as_deref(), Some("nord"));
-        assert_eq!(theme.title.as_deref(), Some("#bf616a"));
-        assert_eq!(theme.separator.as_deref(), Some(" -> "));
-        assert!(theme.keys.is_none());
+        assert_eq!(theme.name(), Some("nord"));
+        let over = theme.overrides();
+        assert_eq!(over.title.as_deref(), Some("#bf616a"));
+        assert_eq!(over.separator.as_deref(), Some(" -> "));
+        assert!(over.keys.is_none());
+
+        let short: Config = serde_json::from_str(r#"{"theme": "gruvbox"}"#).unwrap();
+        assert_eq!(short.theme.as_ref().unwrap().name(), Some("gruvbox"));
+
+        let custom: Config = serde_json::from_str(
+            r#"{"themes": {"my-theme": {"keys": "cyan", "logo_color": "red"}}}"#,
+        )
+        .unwrap();
+        let found = crate::config::lookup_theme(&custom, "my-theme").unwrap();
+        assert_eq!(found.keys.as_deref(), Some("cyan"));
+        assert_eq!(found.logo_color.as_deref(), Some("red"));
+        assert!(crate::config::all_theme_names(&custom).contains(&"my-theme".to_string()));
     }
 
     #[test]
@@ -306,6 +361,38 @@ mod tests {
         let cleaned = strip_jsonc_comments(jsonc);
         let parsed: serde_json::Value = serde_json::from_str(&cleaned).unwrap();
         assert_eq!(parsed["key"], "value");
+    }
+
+    #[test]
+    fn theme_preview_lines_use_theme_colors() {
+        use crate::config::parse_color;
+        use crate::info::types::SystemInfo;
+        use crate::printer::format_module_lines;
+        let info = SystemInfo {
+            user: "user".into(),
+            hostname: "host".into(),
+            os: Some("TestOS 1.0 x86_64".into()),
+            ..Default::default()
+        };
+        let cfg: Config =
+            serde_json::from_str(r#"{"themes": {"testy": {"keys": "cyan", "separator": " => "}}}"#)
+                .unwrap();
+        let colors = crate::config::lookup_theme(&cfg, "testy").unwrap();
+        let key_ansi = colors.keys.as_deref().and_then(parse_color).unwrap();
+        let structure = vec!["os".to_string()];
+        let lines = format_module_lines(
+            &info,
+            false,
+            &key_ansi,
+            None,
+            colors.value.as_deref(),
+            colors.separator.as_deref(),
+            Some(&structure),
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("OS"));
+        assert!(lines[0].contains("=>"));
+        assert!(lines[0].contains("\x1b[1;36m"));
     }
 
     #[test]

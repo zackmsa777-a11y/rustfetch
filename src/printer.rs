@@ -103,143 +103,139 @@ pub fn format_module_lines(
             }
             "os" => {
                 if let Some(ref val) = info.os {
-                    lines.push(format!("{key_col}OS:{val_prefix}{value_col}{val}{reset}"));
+                    lines.push(format!("{key_col}OS{val_prefix}{value_col}{val}{reset}"));
                 }
             }
             "host" => {
                 if let Some(ref val) = info.host {
-                    lines.push(format!("{key_col}Host:{val_prefix}{value_col}{val}{reset}"));
+                    lines.push(format!("{key_col}Host{val_prefix}{value_col}{val}{reset}"));
                 }
             }
             "kernel" => {
                 if let Some(ref val) = info.kernel {
                     lines.push(format!(
-                        "{key_col}Kernel:{val_prefix}{value_col}{val}{reset}"
+                        "{key_col}Kernel{val_prefix}{value_col}{val}{reset}"
                     ));
                 }
             }
             "uptime" => {
                 if let Some(ref val) = info.uptime {
                     lines.push(format!(
-                        "{key_col}Uptime:{val_prefix}{value_col}{val}{reset}"
+                        "{key_col}Uptime{val_prefix}{value_col}{val}{reset}"
                     ));
                 }
             }
             "packages" => {
                 if let Some(ref val) = info.packages {
                     lines.push(format!(
-                        "{key_col}Packages:{val_prefix}{value_col}{val}{reset}"
+                        "{key_col}Packages{val_prefix}{value_col}{val}{reset}"
                     ));
                 }
             }
             "shell" => {
                 if let Some(ref val) = info.shell {
-                    lines.push(format!(
-                        "{key_col}Shell:{val_prefix}{value_col}{val}{reset}"
-                    ));
+                    lines.push(format!("{key_col}Shell{val_prefix}{value_col}{val}{reset}"));
                 }
             }
             "display" => {
                 if let Some(ref val) = info.display {
                     if let Some((conn, rest)) = val.split_once(':') {
+                        let rest = rest.trim_start();
                         lines.push(format!(
-                            "{key_col}Display ({conn}):{val_prefix}{value_col}{rest}{reset}"
+                            "{key_col}Display ({conn}){val_prefix}{value_col}{rest}{reset}"
                         ));
                     } else {
                         lines.push(format!(
-                            "{key_col}Display:{val_prefix}{value_col}{val}{reset}"
+                            "{key_col}Display{val_prefix}{value_col}{val}{reset}"
                         ));
                     }
                 }
             }
             "de" => {
                 if let Some(ref val) = info.de {
-                    lines.push(format!("{key_col}DE:{val_prefix}{value_col}{val}{reset}"));
+                    lines.push(format!("{key_col}DE{val_prefix}{value_col}{val}{reset}"));
                 }
             }
             "wm" => {
                 if let Some(ref val) = info.wm {
-                    lines.push(format!("{key_col}WM:{val_prefix}{value_col}{val}{reset}"));
+                    lines.push(format!("{key_col}WM{val_prefix}{value_col}{val}{reset}"));
                 }
             }
             "wm_theme" => {
                 if let Some(ref val) = info.wm_theme {
                     lines.push(format!(
-                        "{key_col}WM Theme:{val_prefix}{value_col}{val}{reset}"
+                        "{key_col}WM Theme{val_prefix}{value_col}{val}{reset}"
                     ));
                 }
             }
             "theme" => {
                 if let Some(ref val) = info.theme {
-                    lines.push(format!(
-                        "{key_col}Theme:{val_prefix}{value_col}{val}{reset}"
-                    ));
+                    lines.push(format!("{key_col}Theme{val_prefix}{value_col}{val}{reset}"));
                 }
             }
             "icons" => {
                 if let Some(ref val) = info.icons {
-                    lines.push(format!(
-                        "{key_col}Icons:{val_prefix}{value_col}{val}{reset}"
-                    ));
+                    lines.push(format!("{key_col}Icons{val_prefix}{value_col}{val}{reset}"));
                 }
             }
             "font" => {
                 if let Some(ref val) = info.font {
-                    lines.push(format!("{key_col}Font:{val_prefix}{value_col}{val}{reset}"));
+                    lines.push(format!("{key_col}Font{val_prefix}{value_col}{val}{reset}"));
                 }
             }
             "cursor" => {
                 if let Some(ref val) = info.cursor {
                     lines.push(format!(
-                        "{key_col}Cursor:{val_prefix}{value_col}{val}{reset}"
+                        "{key_col}Cursor{val_prefix}{value_col}{val}{reset}"
                     ));
                 }
             }
             "terminal" => {
                 if let Some(ref val) = info.terminal {
                     lines.push(format!(
-                        "{key_col}Terminal:{val_prefix}{value_col}{val}{reset}"
+                        "{key_col}Terminal{val_prefix}{value_col}{val}{reset}"
                     ));
                 }
             }
             "terminal_font" => {
                 if let Some(ref val) = info.terminal_font {
                     lines.push(format!(
-                        "{key_col}Terminal Font:{val_prefix}{value_col}{val}{reset}"
+                        "{key_col}Terminal Font{val_prefix}{value_col}{val}{reset}"
                     ));
                 }
             }
             "cpu" => {
                 if let Some(ref val) = info.cpu {
-                    lines.push(format!("{key_col}CPU:{val_prefix}{value_col}{val}{reset}"));
+                    lines.push(format!("{key_col}CPU{val_prefix}{value_col}{val}{reset}"));
                 }
             }
             "gpu" => {
                 if let Some(ref val) = info.gpu {
-                    lines.push(format!("{key_col}GPU:{val_prefix}{value_col}{val}{reset}"));
+                    lines.push(format!("{key_col}GPU{val_prefix}{value_col}{val}{reset}"));
                 }
             }
             "memory" => {
                 if let Some(ref val) = info.memory {
                     lines.push(format!(
-                        "{key_col}Memory:{val_prefix}{value_col}{val}{reset}"
+                        "{key_col}Memory{val_prefix}{value_col}{val}{reset}"
                     ));
                 }
             }
             "swap" => {
                 if let Some(ref val) = info.swap {
-                    lines.push(format!("{key_col}Swap:{val_prefix}{value_col}{val}{reset}"));
+                    lines.push(format!("{key_col}Swap{val_prefix}{value_col}{val}{reset}"));
                 }
             }
             "disk" => {
                 if let Some(ref disks) = info.disk {
                     for d in disks {
                         if let Some((mount, rest)) = d.split_once(':') {
+                            let rest = rest.trim_start();
                             lines.push(format!(
-                                "{key_col}Disk ({mount}):{val_prefix}{value_col}{rest}{reset}"
+                                "{key_col}Disk ({mount}){val_prefix}{value_col}{rest}{reset}"
                             ));
                         } else {
-                            lines.push(format!("{key_col}Disk:{val_prefix}{value_col}{d}{reset}"));
+                            lines.push(format!("{key_col}Disk{val_prefix}{value_col}{d}{reset}"));
                         }
                     }
                 }
@@ -247,33 +243,32 @@ pub fn format_module_lines(
             "battery" => {
                 if let Some(ref val) = info.battery {
                     lines.push(format!(
-                        "{key_col}Battery:{val_prefix}{value_col}{val}{reset}"
+                        "{key_col}Battery{val_prefix}{value_col}{val}{reset}"
                     ));
                 }
             }
             "power_adapter" => {
                 if let Some(ref val) = info.power_adapter {
                     lines.push(format!(
-                        "{key_col}Power Adapter:{val_prefix}{value_col}{val}{reset}"
+                        "{key_col}Power Adapter{val_prefix}{value_col}{val}{reset}"
                     ));
                 }
             }
             "audio" => {
                 if let Some(ref val) = info.audio {
-                    lines.push(format!(
-                        "{key_col}Audio:{val_prefix}{value_col}{val}{reset}"
-                    ));
+                    lines.push(format!("{key_col}Audio{val_prefix}{value_col}{val}{reset}"));
                 }
             }
             "local_ip" => {
                 if let Some(ref val) = info.local_ip {
                     if let Some((iface, rest)) = val.split_once(':') {
+                        let rest = rest.trim_start();
                         lines.push(format!(
-                            "{key_col}Local IP ({iface}):{val_prefix}{value_col}{rest}{reset}"
+                            "{key_col}Local IP ({iface}){val_prefix}{value_col}{rest}{reset}"
                         ));
                     } else {
                         lines.push(format!(
-                            "{key_col}Local IP:{val_prefix}{value_col}{val}{reset}"
+                            "{key_col}Local IP{val_prefix}{value_col}{val}{reset}"
                         ));
                     }
                 }
@@ -281,7 +276,7 @@ pub fn format_module_lines(
             "locale" => {
                 if let Some(ref val) = info.locale {
                     lines.push(format!(
-                        "{key_col}Locale:{val_prefix}{value_col}{val}{reset}"
+                        "{key_col}Locale{val_prefix}{value_col}{val}{reset}"
                     ));
                 }
             }

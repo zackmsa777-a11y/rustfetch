@@ -37,6 +37,7 @@ pub struct ThemeColors {
     pub keys: Option<String>,
     pub value: Option<String>,
     pub separator: Option<String>,
+    pub logo_color: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -46,6 +47,38 @@ pub struct ThemeSetting {
     pub keys: Option<String>,
     pub value: Option<String>,
     pub separator: Option<String>,
+    pub logo_color: Option<String>,
+}
+
+/// Accepts `"theme": "gruvbox"` shorthand or the full object form.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ThemeArg {
+    Name(String),
+    Full(ThemeSetting),
+}
+
+impl ThemeArg {
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            ThemeArg::Name(s) => Some(s.as_str()),
+            ThemeArg::Full(t) => t.name.as_deref(),
+        }
+    }
+
+    pub fn overrides(&self) -> ThemeSetting {
+        match self {
+            ThemeArg::Name(_) => ThemeSetting::default(),
+            ThemeArg::Full(t) => ThemeSetting {
+                name: None,
+                title: t.title.clone(),
+                keys: t.keys.clone(),
+                value: t.value.clone(),
+                separator: t.separator.clone(),
+                logo_color: t.logo_color.clone(),
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -55,61 +88,125 @@ pub struct Config {
     pub no_logo: Option<bool>,
     pub no_color: Option<bool>,
     pub display: Option<DisplaySetting>,
-    pub theme: Option<ThemeSetting>,
+    pub theme: Option<ThemeArg>,
+    /// User-defined themes: `"themes": { "my-theme": { "keys": "cyan", ... } }`.
+    pub themes: Option<std::collections::HashMap<String, ThemeColors>>,
     pub modules: Option<Vec<ModuleSetting>>,
     pub disk_paths: Option<Vec<String>>,
     pub color_keys: Option<String>,
 }
 
-pub const THEME_PRESETS: &[(&str, [(&str, &str); 3])] = &[
-    ("default", [("title", ""), ("keys", ""), ("value", "")]),
-    (
-        "neon",
-        [("title", "magenta"), ("keys", "cyan"), ("value", "white")],
-    ),
-    (
-        "gruvbox",
-        [("title", "yellow"), ("keys", "208"), ("value", "green")],
-    ),
-    (
-        "nord",
-        [("title", "blue"), ("keys", "110"), ("value", "white")],
-    ),
-    (
-        "dracula",
-        [("title", "magenta"), ("keys", "141"), ("value", "220")],
-    ),
-    (
-        "tokyo-night",
-        [("title", "magenta"), ("keys", "151"), ("value", "white")],
-    ),
-    (
-        "everforest",
-        [("title", "green"), ("keys", "151"), ("value", "yellow")],
-    ),
+pub const BUILTIN_THEME_NAMES: &[&str] = &[
+    "default",
+    "neon",
+    "gruvbox",
+    "nord",
+    "dracula",
+    "tokyo-night",
+    "everforest",
 ];
 
+/// Built-in preset definitions. Custom `themes` from the config take
+/// precedence over these when names collide.
 pub fn resolve_theme(name: &str) -> Option<ThemeColors> {
-    let lower = name.to_lowercase();
-    let preset = THEME_PRESETS
-        .iter()
-        .find(|(preset, _)| *preset == lower)
-        .map(|(_, fields)| fields)?;
-
-    let mut colors = ThemeColors::default();
-    for (key, value) in preset {
-        if value.is_empty() {
-            continue;
+    let mut out = ThemeColors::default();
+    match name.to_lowercase().as_str() {
+        "default" => Some(out),
+        "neon" => {
+            out.title = Some("magenta".into());
+            out.keys = Some("cyan".into());
+            out.value = Some("white".into());
+            Some(out)
         }
-        match *key {
-            "title" => colors.title = Some((*value).to_string()),
-            "keys" => colors.keys = Some((*value).to_string()),
-            "value" => colors.value = Some((*value).to_string()),
-            "separator" => colors.separator = Some((*value).to_string()),
-            _ => {}
+        "gruvbox" => {
+            out.title = Some("yellow".into());
+            out.keys = Some("208".into());
+            out.value = Some("green".into());
+            Some(out)
+        }
+        "nord" => {
+            out.title = Some("blue".into());
+            out.keys = Some("110".into());
+            out.value = Some("white".into());
+            Some(out)
+        }
+        "dracula" => {
+            out.title = Some("magenta".into());
+            out.keys = Some("141".into());
+            out.value = Some("220".into());
+            Some(out)
+        }
+        "tokyo-night" => {
+            out.title = Some("magenta".into());
+            out.keys = Some("151".into());
+            out.value = Some("white".into());
+            Some(out)
+        }
+        "everforest" => {
+            out.title = Some("green".into());
+            out.keys = Some("151".into());
+            out.value = Some("yellow".into());
+            Some(out)
+        }
+        _ => None,
+    }
+}
+
+/// Look up a theme by name: user `themes` first (case-insensitive), then built-ins.
+pub fn lookup_theme(cfg: &Config, name: &str) -> Option<ThemeColors> {
+    if let Some(custom) = cfg.themes.as_ref() {
+        for (key, colors) in custom {
+            if key.eq_ignore_ascii_case(name) {
+                return Some(colors.clone());
+            }
         }
     }
-    Some(colors)
+    resolve_theme(name)
+}
+
+/// All available theme names: built-ins first, then user-defined ones.
+pub fn all_theme_names(cfg: &Config) -> Vec<String> {
+    let mut names: Vec<String> = BUILTIN_THEME_NAMES.iter().map(|s| s.to_string()).collect();
+    if let Some(custom) = cfg.themes.as_ref() {
+        let mut extra: Vec<String> = custom
+            .keys()
+            .filter(|k| {
+                !BUILTIN_THEME_NAMES
+                    .iter()
+                    .any(|b| b.eq_ignore_ascii_case(k))
+            })
+            .cloned()
+            .collect();
+        extra.sort();
+        names.extend(extra);
+    }
+    names
+}
+
+/// Merge a base theme with per-field overrides (overrides win when set).
+pub fn merge_theme(base: ThemeColors, over: &ThemeSetting) -> ThemeColors {
+    ThemeColors {
+        title: over.title.clone().or(base.title),
+        keys: over.keys.clone().or(base.keys),
+        value: over.value.clone().or(base.value),
+        separator: over.separator.clone().or(base.separator),
+        logo_color: over.logo_color.clone().or(base.logo_color),
+    }
+}
+
+/// Active theme selection: returns (selected name if any, merged colors).
+pub fn active_theme(cfg: &Config) -> (Option<String>, ThemeColors) {
+    let arg = match cfg.theme.as_ref() {
+        Some(a) => a,
+        None => return (None, ThemeColors::default()),
+    };
+    let name = arg.name().map(|s| s.to_string());
+    let base = name
+        .as_deref()
+        .and_then(|n| lookup_theme(cfg, n))
+        .unwrap_or_default();
+    let over = arg.overrides();
+    (name, merge_theme(base, &over))
 }
 
 /// Resolve a color spec to an ANSI escape. Supports the 8 basic names,
@@ -298,6 +395,46 @@ pub fn load_config(path: Option<&Path>) -> Config {
     Config::default()
 }
 
+/// Writable default location for `rustfetch` configs (never a fastfetch path).
+pub fn default_config_path_for_write() -> PathBuf {
+    if let Ok(base) = env::var("XDG_CONFIG_HOME") {
+        return Path::new(&base).join("rustfetch/config.jsonc");
+    }
+    if let Ok(home) = env::var("HOME") {
+        return Path::new(&home).join(".config/rustfetch/config.jsonc");
+    }
+    PathBuf::from("rustfetch-config.jsonc")
+}
+
+/// Persist the selected theme name into the config file.
+/// Keeps every other key untouched; creates the file if missing.
+pub fn save_theme_name(path: Option<&Path>, name: &str) -> Result<PathBuf, String> {
+    let target: PathBuf = match path {
+        Some(p) => p.to_path_buf(),
+        None => find_default_config_path().unwrap_or_else(default_config_path_for_write),
+    };
+
+    let mut value = if target.exists() {
+        let raw = fs::read_to_string(&target).map_err(|e| e.to_string())?;
+        let stripped = strip_jsonc_comments(&raw);
+        serde_json::from_str::<serde_json::Value>(&stripped).unwrap_or(serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+
+    let obj = value
+        .as_object_mut()
+        .ok_or("config root must be an object")?;
+    obj.insert("theme".to_string(), serde_json::json!({ "name": name }));
+
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let pretty = serde_json::to_string_pretty(&value).map_err(|e| e.to_string())?;
+    fs::write(&target, pretty + "\n").map_err(|e| e.to_string())?;
+    Ok(target)
+}
+
 pub fn generate_default_config() -> String {
     let default_cfg = serde_json::json!({
         "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
@@ -315,6 +452,15 @@ pub fn generate_default_config() -> String {
         },
         "theme": {
             "name": "default"
+        },
+        "themes": {
+            "sunset": {
+                "title": "#ff9e64",
+                "keys": "208",
+                "value": "#7aa2f7",
+                "separator": " => ",
+                "logo_color": "208"
+            }
         },
         "modules": [
             "title",
