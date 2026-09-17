@@ -3,12 +3,12 @@
 # rustfetch
 
 **A blazingly fast, highly extensible system information fetch tool written in Rust.**
-*Full fastfetch parity • 22+ authentic distro logos • Real hardware probes • Zero runtime bloat*
+*Full fastfetch parity • 44+ authentic distro logos • Real hardware probes • Zero runtime bloat*
 
 [![CI](https://github.com/zackmsa777-a11y/rustfetch/actions/workflows/ci.yml/badge.svg)](https://github.com/zackmsa777-a11y/rustfetch/actions/workflows/ci.yml)
 [![Release](https://github.com/zackmsa777-a11y/rustfetch/actions/workflows/release.yml/badge.svg)](https://github.com/zackmsa777-a11y/rustfetch/releases)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
-[![Rust: 2021 Edition](https://img.shields.io/badge/Rust-2021%20Edition-red.svg)](https://www.rust-lang.org/)
+[![Rust: 2024 Edition](https://img.shields.io/badge/Rust-2024%20Edition-red.svg)](https://www.rust-lang.org/)
 [![Author](https://img.shields.io/badge/author-zackmsa777--a11y-purple.svg)](https://github.com/zackmsa777-a11y)
 [![Performance](https://img.shields.io/badge/startup-<5ms-brightgreen.svg)](#benchmarks)
 
@@ -43,7 +43,7 @@
 
 - **Blazingly Fast**: Executes in **< 5ms** using native Linux `procfs`, `sysfs`, and `libc` calls. No shell forks, no slow subcommands.
 - **Concurrent Multi-threaded Probes**: Hardware and environment modules run in parallel with scoped threads (`std::thread::scope`).
-- **22+ Distro and OS Logos**: Complete authentic ASCII art collection with accurate distro brand colors (Arch, NixOS, Fedora, Ubuntu, Debian, Alpine, Gentoo, macOS, Windows, and more).
+- **44+ Distro and OS Logos**: Complete authentic ASCII art collection with accurate distro brand colors (Arch, NixOS, Fedora, Ubuntu, Debian, Alpine, Gentoo, macOS, Windows, and more).
 - **Real System Detection**: Real hardware metrics—not hardcoded strings or mock prints. Accurately queries CPU, GPU, memory, swap, mount points, battery, displays, desktop environments, window managers, themes, fonts, and network interfaces.
 - **Structured JSON Output**: Full `--json` export for scripts, monitoring, dotfile automation, and integrations.
 - **JSONC Configuration**: Supports customizable layouts, module filters, and overrides via `~/.config/rustfetch/config.jsonc`.
