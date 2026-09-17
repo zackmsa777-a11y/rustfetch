@@ -1,0 +1,48 @@
+name: Bug Report
+description: Create a bug report to help us fix issues in rustfetch
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a problem in `rustfetch`! Please provide the details below.
+  - type: input
+    id: os
+    attributes:
+      label: Operating System & Distribution
+      description: e.g. Ubuntu 24.04 LTS, Arch Linux, macOS Sonoma 14.5
+      placeholder: Ubuntu 24.04 LTS
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: rustfetch Version
+      description: Output of `rustfetch --version`
+      placeholder: rustfetch 0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what unexpected behavior occurred.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction Steps
+      description: What commands or flags did you run?
+      placeholder: |
+        1. Run `rustfetch --logo arch`
+        2. Observe incorrect output
+    validations:
+      required: true
+  - type: textarea
+    id: json_output
+    attributes:
+      label: Raw JSON Diagnostics
+      description: Output of `rustfetch --json` (helps diagnose module detection errors)
+      render: json

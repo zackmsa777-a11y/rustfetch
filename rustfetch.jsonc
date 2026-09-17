@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/zackmsa777-a11y/rustfetch/master/schema/config.json",
+  "logo": "auto",
+  "logo_color": "auto",
+  "no_logo": false,
+  "no_color": false,
+  "modules": [
+    "title",
+    "separator",
+    "os",
+    "host",
+    "kernel",
+    "uptime",
+    "packages",
+    "shell",
+    "display",
+    "de",
+    "wm",
+    "wm_theme",
+    "theme",
+    "icons",
+    "font",
+    "cursor",
+    "terminal",
+    "terminal_font",
+    "cpu",
+    "gpu",
+    "memory",
+    "swap",
+    "disk",
+    "battery",
+    "power_adapter",
+    "audio",
+    "local_ip",
+    "locale",
+    "break",
+    "colors"
+  ],
+  "disk_paths": [
+    "/"
+  ]
+}
