@@ -132,7 +132,9 @@ pub fn print_modules() {
     println!("  - host           (motherboard, chassis, model, virtualization)");
     println!("  - kernel         (kernel name and release version)");
     println!("  - uptime         (system uptime in days, hours, minutes)");
-    println!("  - packages       (package counts across dpkg, pacman, rpm, flatpak, snap, nix, apk, brew)");
+    println!(
+        "  - packages       (package counts across dpkg, pacman, rpm, flatpak, snap, nix, apk, brew)"
+    );
     println!("  - shell          (active shell path, name, and version)");
     println!("  - display        (resolution and connected monitors)");
     println!("  - de             (desktop environment name and version)");

@@ -78,10 +78,10 @@ pub fn detect_host() -> Option<String> {
 
     let mut host_str = parts.join(" ");
 
-    if let Some(ver) = version {
-        if !host_str.contains(&ver) {
-            host_str.push_str(&format!(" ({ver})"));
-        }
+    if let Some(ver) = version
+        && !host_str.contains(&ver)
+    {
+        host_str.push_str(&format!(" ({ver})"));
     }
 
     Some(host_str)

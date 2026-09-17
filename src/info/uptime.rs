@@ -44,10 +44,10 @@ pub fn parse_uptime_str(input: &str) -> Option<String> {
 }
 
 pub fn detect_uptime() -> Option<String> {
-    if let Ok(content) = fs::read_to_string("/proc/uptime") {
-        if let Some(parsed) = parse_uptime_str(&content) {
-            return Some(parsed);
-        }
+    if let Ok(content) = fs::read_to_string("/proc/uptime")
+        && let Some(parsed) = parse_uptime_str(&content)
+    {
+        return Some(parsed);
     }
 
     let mut sys: libc::sysinfo = unsafe { std::mem::zeroed() };

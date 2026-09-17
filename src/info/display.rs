@@ -6,18 +6,17 @@ pub fn detect_display() -> Option<String> {
         for entry in entries.flatten() {
             let path = entry.path();
             let modes_file = path.join("modes");
-            if modes_file.is_file() {
-                if let Ok(content) = fs::read_to_string(modes_file) {
-                    if let Some(mode) = content.lines().next() {
-                        let connector = entry
-                            .file_name()
-                            .to_string_lossy()
-                            .trim_start_matches("card0-")
-                            .trim_start_matches("card1-")
-                            .to_string();
-                        return Some(format!("{connector}: {mode}"));
-                    }
-                }
+            if modes_file.is_file()
+                && let Ok(content) = fs::read_to_string(modes_file)
+                && let Some(mode) = content.lines().next()
+            {
+                let connector = entry
+                    .file_name()
+                    .to_string_lossy()
+                    .trim_start_matches("card0-")
+                    .trim_start_matches("card1-")
+                    .to_string();
+                return Some(format!("{connector}: {mode}"));
             }
         }
     }
@@ -28,10 +27,11 @@ pub fn detect_display() -> Option<String> {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if let Some(name) = parts.first() {
                     for part in parts.iter().skip(1) {
-                        if part.contains('x') && part.contains('+') {
-                            if let Some((res, _)) = part.split_once('+') {
-                                return Some(format!("{name}: {res}"));
-                            }
+                        if part.contains('x')
+                            && part.contains('+')
+                            && let Some((res, _)) = part.split_once('+')
+                        {
+                            return Some(format!("{name}: {res}"));
                         }
                     }
                 }
@@ -42,10 +42,10 @@ pub fn detect_display() -> Option<String> {
     if let Some(out) = run_cmd("hyprctl", &["monitors"]) {
         for line in out.lines() {
             let l = line.trim();
-            if l.starts_with("Monitor ") {
-                if let Some(name) = l.split_whitespace().nth(1) {
-                    return Some(clean(name));
-                }
+            if l.starts_with("Monitor ")
+                && let Some(name) = l.split_whitespace().nth(1)
+            {
+                return Some(clean(name));
             }
         }
     }

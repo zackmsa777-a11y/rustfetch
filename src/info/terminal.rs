@@ -20,12 +20,12 @@ pub fn detect_terminal() -> (Option<String>, Option<String>) {
         }
     }
 
-    if term_name.is_none() {
-        if let Ok(term_env) = env::var("TERMINAL") {
-            let clean_t = clean(&term_env);
-            if !clean_t.is_empty() {
-                term_name = Some(clean_t);
-            }
+    if term_name.is_none()
+        && let Ok(term_env) = env::var("TERMINAL")
+    {
+        let clean_t = clean(&term_env);
+        if !clean_t.is_empty() {
+            term_name = Some(clean_t);
         }
     }
 
@@ -55,16 +55,16 @@ pub fn detect_terminal() -> (Option<String>, Option<String>) {
             }
 
             let stat_path = format!("/proc/{curr_pid}/stat");
-            if let Ok(stat_content) = fs::read_to_string(&stat_path) {
-                if let Some(rparen) = stat_content.rfind(')') {
-                    let rest = &stat_content[rparen + 1..];
-                    let parts: Vec<&str> = rest.split_whitespace().collect();
-                    if parts.len() >= 2 {
-                        if let Ok(parent_pid) = parts[1].parse::<i32>() {
-                            curr_pid = parent_pid;
-                            continue;
-                        }
-                    }
+            if let Ok(stat_content) = fs::read_to_string(&stat_path)
+                && let Some(rparen) = stat_content.rfind(')')
+            {
+                let rest = &stat_content[rparen + 1..];
+                let parts: Vec<&str> = rest.split_whitespace().collect();
+                if parts.len() >= 2
+                    && let Ok(parent_pid) = parts[1].parse::<i32>()
+                {
+                    curr_pid = parent_pid;
+                    continue;
                 }
             }
             break;
@@ -88,26 +88,26 @@ pub fn detect_terminal() -> (Option<String>, Option<String>) {
         }
     }
 
-    if env::var("SSH_CONNECTION").is_ok() || env::var("SSH_TTY").is_ok() {
-        if let Some(ssh_out) = run_cmd("ssh", &["-V"]) {
-            let ver = ssh_out.trim_start_matches("OpenSSH_");
-            if let Some(ref mut name) = term_name {
-                name.push_str(&format!(" ({ver})"));
-            }
+    if (env::var("SSH_CONNECTION").is_ok() || env::var("SSH_TTY").is_ok())
+        && let Some(ssh_out) = run_cmd("ssh", &["-V"])
+    {
+        let ver = ssh_out.trim_start_matches("OpenSSH_");
+        if let Some(ref mut name) = term_name {
+            name.push_str(&format!(" ({ver})"));
         }
     }
 
     if let Ok(home) = env::var("HOME") {
         let kitty_conf = Path::new(&home).join(".config/kitty/kitty.conf");
-        if kitty_conf.exists() {
-            if let Ok(content) = fs::read_to_string(kitty_conf) {
-                for line in content.lines() {
-                    if line.starts_with("font_family") {
-                        if let Some((_, f)) = line.split_once(' ') {
-                            term_font = Some(clean(f.trim()));
-                            break;
-                        }
-                    }
+        if kitty_conf.exists()
+            && let Ok(content) = fs::read_to_string(kitty_conf)
+        {
+            for line in content.lines() {
+                if line.starts_with("font_family")
+                    && let Some((_, f)) = line.split_once(' ')
+                {
+                    term_font = Some(clean(f.trim()));
+                    break;
                 }
             }
         }

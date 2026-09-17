@@ -23,15 +23,14 @@ pub fn detect_packages() -> Option<String> {
         }
     }
 
-    if Path::new("/var/lib/rpm").exists() {
-        if let Ok(output) = Command::new("rpm")
+    if Path::new("/var/lib/rpm").exists()
+        && let Ok(output) = Command::new("rpm")
             .args(["-qa", "--nodigest", "--nosignature"])
             .output()
-        {
-            let count = String::from_utf8_lossy(&output.stdout).lines().count();
-            if count > 0 {
-                counts.push(format!("{count} (rpm)"));
-            }
+    {
+        let count = String::from_utf8_lossy(&output.stdout).lines().count();
+        if count > 0 {
+            counts.push(format!("{count} (rpm)"));
         }
     }
 
@@ -39,10 +38,10 @@ pub fn detect_packages() -> Option<String> {
     if let Ok(entries) = fs::read_dir("/var/lib/flatpak/app") {
         flatpak_count += entries.flatten().filter(|e| e.path().is_dir()).count();
     }
-    if let Ok(home) = env::var("HOME") {
-        if let Ok(entries) = fs::read_dir(Path::new(&home).join(".local/share/flatpak/app")) {
-            flatpak_count += entries.flatten().filter(|e| e.path().is_dir()).count();
-        }
+    if let Ok(home) = env::var("HOME")
+        && let Ok(entries) = fs::read_dir(Path::new(&home).join(".local/share/flatpak/app"))
+    {
+        flatpak_count += entries.flatten().filter(|e| e.path().is_dir()).count();
     }
     if flatpak_count > 0 {
         counts.push(format!("{flatpak_count} (flatpak)"));
@@ -62,46 +61,45 @@ pub fn detect_packages() -> Option<String> {
         }
     }
 
-    if Path::new("/nix/var/nix/profiles/default").exists() {
-        if let Ok(output) = Command::new("nix-store")
+    if Path::new("/nix/var/nix/profiles/default").exists()
+        && let Ok(output) = Command::new("nix-store")
             .args(["--query", "--requisites", "/nix/var/nix/profiles/default"])
             .output()
-        {
-            let text = String::from_utf8_lossy(&output.stdout);
-            let count = text
-                .lines()
-                .filter(|l| {
-                    if !Path::new(l).is_dir() {
-                        return false;
-                    }
-                    let base = Path::new(l)
-                        .file_name()
-                        .and_then(|f| f.to_str())
-                        .unwrap_or("");
-                    if base.starts_with("nixos-system-nixos-")
-                        || base.ends_with("-doc")
-                        || base.ends_with("-man")
-                        || base.ends_with("-info")
-                        || base.ends_with("-dev")
-                        || base.ends_with("-bin")
+    {
+        let text = String::from_utf8_lossy(&output.stdout);
+        let count = text
+            .lines()
+            .filter(|l| {
+                if !Path::new(l).is_dir() {
+                    return false;
+                }
+                let base = Path::new(l)
+                    .file_name()
+                    .and_then(|f| f.to_str())
+                    .unwrap_or("");
+                if base.starts_with("nixos-system-nixos-")
+                    || base.ends_with("-doc")
+                    || base.ends_with("-man")
+                    || base.ends_with("-info")
+                    || base.ends_with("-dev")
+                    || base.ends_with("-bin")
+                {
+                    return false;
+                }
+                let bytes = base.as_bytes();
+                for i in 1..bytes.len().saturating_sub(1) {
+                    if bytes[i] == b'.'
+                        && bytes[i - 1].is_ascii_digit()
+                        && bytes[i + 1].is_ascii_digit()
                     {
-                        return false;
+                        return true;
                     }
-                    let bytes = base.as_bytes();
-                    for i in 1..bytes.len().saturating_sub(1) {
-                        if bytes[i] == b'.'
-                            && bytes[i - 1].is_ascii_digit()
-                            && bytes[i + 1].is_ascii_digit()
-                        {
-                            return true;
-                        }
-                    }
-                    false
-                })
-                .count();
-            if count > 0 {
-                counts.push(format!("{count} (nix-default)"));
-            }
+                }
+                false
+            })
+            .count();
+        if count > 0 {
+            counts.push(format!("{count} (nix-default)"));
         }
     }
 
@@ -115,10 +113,10 @@ pub fn detect_packages() -> Option<String> {
     if let Ok(entries) = fs::read_dir("/var/db/pkg") {
         let mut count = 0;
         for cat in entries.flatten() {
-            if cat.path().is_dir() {
-                if let Ok(pkgs) = fs::read_dir(cat.path()) {
-                    count += pkgs.flatten().filter(|p| p.path().is_dir()).count();
-                }
+            if cat.path().is_dir()
+                && let Ok(pkgs) = fs::read_dir(cat.path())
+            {
+                count += pkgs.flatten().filter(|p| p.path().is_dir()).count();
             }
         }
         if count > 0 {

@@ -34,17 +34,16 @@ pub fn detect_gpu() -> Option<String> {
 
     if let Some(lspci_out) = run_cmd("lspci", &[]) {
         for line in lspci_out.lines() {
-            if line.contains("VGA compatible controller")
+            if (line.contains("VGA compatible controller")
                 || line.contains("3D controller")
-                || line.contains("Display controller")
+                || line.contains("Display controller"))
+                && let Some((_, rest)) = line.split_once(": ")
             {
-                if let Some((_, rest)) = line.split_once(": ") {
-                    let cleaned = rest.trim();
-                    if cleaned.contains("1234:1111") {
-                        return Some("QEMU Virtual Video Controller".into());
-                    }
-                    return Some(clean(cleaned));
+                let cleaned = rest.trim();
+                if cleaned.contains("1234:1111") {
+                    return Some("QEMU Virtual Video Controller".into());
                 }
+                return Some(clean(cleaned));
             }
         }
     }

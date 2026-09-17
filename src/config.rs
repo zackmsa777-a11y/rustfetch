@@ -45,9 +45,9 @@ pub struct Config {
 
 impl Config {
     pub fn get_logo_name(&self) -> Option<String> {
-        match self.logo {
-            Some(LogoSetting::Name(ref n)) => Some(n.clone()),
-            Some(LogoSetting::Object { ref source, .. }) => source.clone(),
+        match &self.logo {
+            Some(LogoSetting::Name(n)) => Some(n.clone()),
+            Some(LogoSetting::Object { source, .. }) => source.clone(),
             None => None,
         }
     }
@@ -56,13 +56,16 @@ impl Config {
         if self.logo_color.is_some() {
             return self.logo_color.clone();
         }
-        if let Some(LogoSetting::Object { ref color, .. }) = self.logo {
-            if let Some(serde_json::Value::String(ref s)) = color {
+        if let Some(LogoSetting::Object {
+            color: Some(color), ..
+        }) = &self.logo
+        {
+            if let serde_json::Value::String(s) = color {
                 return Some(s.clone());
-            } else if let Some(serde_json::Value::Object(ref map)) = color {
-                if let Some(serde_json::Value::String(ref s)) = map.get("1") {
-                    return Some(s.clone());
-                }
+            } else if let serde_json::Value::Object(map) = color
+                && let Some(serde_json::Value::String(s)) = map.get("1")
+            {
+                return Some(s.clone());
             }
         }
         None
@@ -72,12 +75,14 @@ impl Config {
         if self.color_keys.is_some() {
             return self.color_keys.clone();
         }
-        if let Some(ref disp) = self.display {
-            if let Some(serde_json::Value::Object(ref color_map)) = disp.color {
-                if let Some(serde_json::Value::String(ref k)) = color_map.get("keys") {
+        if let Some(disp) = &self.display
+            && let Some(color) = &disp.color
+        {
+            if let serde_json::Value::Object(color_map) = color {
+                if let Some(serde_json::Value::String(k)) = color_map.get("keys") {
                     return Some(k.clone());
                 }
-            } else if let Some(serde_json::Value::String(ref s)) = disp.color {
+            } else if let serde_json::Value::String(s) = color {
                 return Some(s.clone());
             }
         }
@@ -132,11 +137,11 @@ pub fn strip_jsonc_comments(input: &str) -> String {
             } else if let Some(&'*') = chars.peek() {
                 chars.next();
                 while let Some(next_c) = chars.next() {
-                    if next_c == '*' {
-                        if let Some(&'/') = chars.peek() {
-                            chars.next();
-                            break;
-                        }
+                    if next_c == '*'
+                        && let Some(&'/') = chars.peek()
+                    {
+                        chars.next();
+                        break;
                     }
                 }
             } else {
@@ -179,12 +184,12 @@ pub fn load_config(path: Option<&Path>) -> Config {
         .map(|p| p.to_path_buf())
         .or_else(find_default_config_path);
 
-    if let Some(p) = target {
-        if let Ok(raw) = fs::read_to_string(p) {
-            let stripped = strip_jsonc_comments(&raw);
-            if let Ok(cfg) = serde_json::from_str::<Config>(&stripped) {
-                return cfg;
-            }
+    if let Some(p) = target
+        && let Ok(raw) = fs::read_to_string(p)
+    {
+        let stripped = strip_jsonc_comments(&raw);
+        if let Ok(cfg) = serde_json::from_str::<Config>(&stripped) {
+            return cfg;
         }
     }
 

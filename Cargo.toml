@@ -1,7 +1,7 @@
 [package]
 name = "rustfetch"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Zack <https://github.com/zackmsa777-a11y>"]
 description = "A blazingly fast, highly extensible, and feature-rich system information tool written in Rust with fastfetch parity and multi-distro logos"
 repository = "https://github.com/zackmsa777-a11y/rustfetch"

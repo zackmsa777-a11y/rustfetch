@@ -9,7 +9,7 @@ use cli::{parse_cli, print_help, print_modules};
 use config::{generate_default_config, load_config};
 use info::gather_info;
 use logos::ALL_LOGOS;
-use printer::{print_fetch, PrintOptions};
+use printer::{PrintOptions, print_fetch};
 use std::env;
 
 fn main() {
@@ -93,7 +93,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use crate::cli::parse_cli;
-    use crate::config::{strip_jsonc_comments, Config};
+    use crate::config::{Config, strip_jsonc_comments};
     use crate::info::cpu::format_cpu;
     use crate::info::memory::format_memory;
     use crate::info::swap::format_swap;
