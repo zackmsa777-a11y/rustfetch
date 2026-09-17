@@ -66,21 +66,26 @@ Measured on a standard Linux workstation (average of 50 runs):
 
 ## Installation
 
-### Cargo via Git (Recommended)
+### Requirements (source builds)
 
-```bash
-cargo install --git https://github.com/zackmsa777-a11y/rustfetch.git
-```
+- **Rust 1.88+** (edition 2024 + let-chains). Older toolchains fail with `E0658`.
+- Recommended: install via [rustup](https://rustup.rs/) and keep `stable` updated.
 
-### Prebuilt Binary (Linux x86_64)
-
-Download and install the official binary release:
+### Prebuilt Binary (recommended)
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/zackmsa777-a11y/rustfetch/master/install.sh | bash
 ```
 
-Or download directly from [GitHub Releases](https://github.com/zackmsa777-a11y/rustfetch/releases/latest).
+The installer picks the latest GitHub Release asset for your OS/arch (musl, gnu, or darwin), validates the download is a real gzip archive (so HTML 404 pages are not fed to `tar`), and falls back to `cargo install --git` if no matching asset exists.
+
+You can also grab archives from [GitHub Releases](https://github.com/zackmsa777-a11y/rustfetch/releases/latest).
+
+### Cargo via Git
+
+```bash
+cargo install --git https://github.com/zackmsa777-a11y/rustfetch.git
+```
 
 ### Build from Source
 
