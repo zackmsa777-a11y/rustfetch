@@ -64,10 +64,42 @@ pub fn run_cmd(cmd: &str, args: &[&str]) -> Option<String> {
             if out.is_empty() {
                 None
             } else {
-                Some(clean(&out))
+                let cleaned: String = out
+                    .chars()
+                    .filter(|&c| c == '\n' || !c.is_control())
+                    .collect();
+                if cleaned.is_empty() {
+                    None
+                } else {
+                    Some(cleaned)
+                }
             }
         } else {
             None
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn run_cmd_preserves_newlines_in_multiline_output() {
+        let dir = std::env::temp_dir().join(format!("rustfetch_test_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("multiline_cmd");
+        std::fs::write(&script, "#!/bin/sh\necho 'line one'\necho 'line two'\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        let out = run_cmd(script.to_str().unwrap(), &[]).unwrap();
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines, vec!["line one", "line two"]);
+
+        std::fs::remove_file(&script).ok();
+    }
 }
