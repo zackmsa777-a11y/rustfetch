@@ -32,15 +32,117 @@ pub struct DisplaySetting {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ThemeColors {
+    pub title: Option<String>,
+    pub keys: Option<String>,
+    pub value: Option<String>,
+    pub separator: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ThemeSetting {
+    pub name: Option<String>,
+    pub title: Option<String>,
+    pub keys: Option<String>,
+    pub value: Option<String>,
+    pub separator: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
     pub logo: Option<LogoSetting>,
     pub logo_color: Option<String>,
     pub no_logo: Option<bool>,
     pub no_color: Option<bool>,
     pub display: Option<DisplaySetting>,
+    pub theme: Option<ThemeSetting>,
     pub modules: Option<Vec<ModuleSetting>>,
     pub disk_paths: Option<Vec<String>>,
     pub color_keys: Option<String>,
+}
+
+pub const THEME_PRESETS: &[(&str, [(&str, &str); 3])] = &[
+    ("default", [("title", ""), ("keys", ""), ("value", "")]),
+    (
+        "neon",
+        [("title", "magenta"), ("keys", "cyan"), ("value", "white")],
+    ),
+    (
+        "gruvbox",
+        [("title", "yellow"), ("keys", "208"), ("value", "green")],
+    ),
+    (
+        "nord",
+        [("title", "blue"), ("keys", "110"), ("value", "white")],
+    ),
+    (
+        "dracula",
+        [("title", "magenta"), ("keys", "141"), ("value", "220")],
+    ),
+    (
+        "tokyo-night",
+        [("title", "magenta"), ("keys", "151"), ("value", "white")],
+    ),
+    (
+        "everforest",
+        [("title", "green"), ("keys", "151"), ("value", "yellow")],
+    ),
+];
+
+pub fn resolve_theme(name: &str) -> Option<ThemeColors> {
+    let lower = name.to_lowercase();
+    let preset = THEME_PRESETS
+        .iter()
+        .find(|(preset, _)| *preset == lower)
+        .map(|(_, fields)| fields)?;
+
+    let mut colors = ThemeColors::default();
+    for (key, value) in preset {
+        if value.is_empty() {
+            continue;
+        }
+        match *key {
+            "title" => colors.title = Some((*value).to_string()),
+            "keys" => colors.keys = Some((*value).to_string()),
+            "value" => colors.value = Some((*value).to_string()),
+            "separator" => colors.separator = Some((*value).to_string()),
+            _ => {}
+        }
+    }
+    Some(colors)
+}
+
+/// Resolve a color spec to an ANSI escape. Supports the 8 basic names,
+/// 0-255 numbers (256-color), "#rrggbb" hex (truecolor), and "auto".
+pub fn parse_color(spec: &str) -> Option<String> {
+    let basic = match spec.to_lowercase().as_str() {
+        "black" => "\x1b[1;30m",
+        "red" => "\x1b[1;31m",
+        "green" => "\x1b[1;32m",
+        "yellow" => "\x1b[1;33m",
+        "blue" => "\x1b[1;34m",
+        "magenta" | "purple" => "\x1b[1;35m",
+        "cyan" => "\x1b[1;36m",
+        "white" => "\x1b[1;37m",
+        _ => "",
+    };
+    if !basic.is_empty() {
+        return Some(basic.to_string());
+    }
+
+    if let Ok(n) = spec.parse::<u8>() {
+        return Some(format!("\x1b[38;5;{n}m"));
+    }
+
+    let hex = spec.strip_prefix('#').unwrap_or(spec);
+    if hex.len() == 6 && hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+        let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+        let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+        return Some(format!("\x1b[38;2;{r};{g};{b}m"));
+    }
+
+    None
 }
 
 impl Config {
@@ -210,6 +312,9 @@ pub fn generate_default_config() -> String {
             "color": {
                 "keys": "auto"
             }
+        },
+        "theme": {
+            "name": "default"
         },
         "modules": [
             "title",

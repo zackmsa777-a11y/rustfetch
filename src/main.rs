@@ -50,6 +50,23 @@ fn main() {
         return;
     }
 
+    if cli_opts.list_themes {
+        println!("Available rustfetch themes:");
+        for (name, fields) in config::THEME_PRESETS {
+            let desc: Vec<String> = fields
+                .iter()
+                .filter(|(_, v)| !v.is_empty())
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect();
+            if desc.is_empty() {
+                println!("  - {name} (distro default colors)");
+            } else {
+                println!("  - {name} ({})", desc.join(", "));
+            }
+        }
+        return;
+    }
+
     let file_cfg = load_config(cli_opts.config_path.as_deref());
 
     let cfg_logo_name = file_cfg.get_logo_name();
@@ -76,13 +93,44 @@ fn main() {
     let system_info = gather_info(effective_disks.map(|v| v.as_slice()));
 
     let cfg_key_color = file_cfg.get_key_color();
+    let theme = file_cfg.theme.as_ref();
+    let theme_colors = theme
+        .as_ref()
+        .and_then(|t| t.name.as_deref())
+        .and_then(config::resolve_theme);
+
+    let keys_raw = theme
+        .and_then(|t| t.keys.as_deref())
+        .or_else(|| theme_colors.as_ref().and_then(|c| c.keys.as_deref()))
+        .or(cfg_key_color.as_deref())
+        .filter(|s| *s != "auto");
+    let title_raw = theme
+        .and_then(|t| t.title.as_deref())
+        .or_else(|| theme_colors.as_ref().and_then(|c| c.title.as_deref()))
+        .filter(|s| *s != "auto");
+    let value_raw = theme
+        .and_then(|t| t.value.as_deref())
+        .or_else(|| theme_colors.as_ref().and_then(|c| c.value.as_deref()))
+        .filter(|s| *s != "auto");
+    let separator_raw = theme
+        .and_then(|t| t.separator.as_deref())
+        .or_else(|| theme_colors.as_ref().and_then(|c| c.separator.as_deref()))
+        .or_else(|| {
+            file_cfg
+                .display
+                .as_ref()
+                .and_then(|d| d.separator.as_deref())
+        });
 
     let print_opts = PrintOptions {
         no_color: effective_no_color,
         no_logo: effective_no_logo,
         logo_override: effective_logo,
         logo_color: effective_logo_color,
-        key_color: cfg_key_color.as_deref(),
+        key_color: keys_raw,
+        title_color: title_raw,
+        value_color: value_raw,
+        separator: separator_raw,
         structure: effective_structure.map(|v| v.as_slice()),
         json: cli_opts.json,
     };
@@ -93,7 +141,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use crate::cli::parse_cli;
-    use crate::config::{Config, strip_jsonc_comments};
+    use crate::config::{Config, parse_color, resolve_theme, strip_jsonc_comments};
     use crate::info::cpu::format_cpu;
     use crate::info::memory::format_memory;
     use crate::info::swap::format_swap;
@@ -200,6 +248,56 @@ mod tests {
         let (rust_lines, _) = get_logo("rust", false, Some("green"));
         assert!(!rust_lines.is_empty());
         assert!(rust_lines[0].contains("\x1b[1;32m"));
+    }
+
+    #[test]
+    fn resolves_theme_presets_and_overrides() {
+        let neon = resolve_theme("neon").unwrap();
+        assert_eq!(neon.keys.as_deref(), Some("cyan"));
+        assert_eq!(neon.title.as_deref(), Some("magenta"));
+        assert_eq!(neon.value.as_deref(), Some("white"));
+
+        let default = resolve_theme("default").unwrap();
+        assert!(default.keys.is_none() && default.title.is_none());
+
+        assert!(resolve_theme("nonexistent").is_none());
+        assert_eq!(
+            resolve_theme("Dracula").unwrap().keys.as_deref(),
+            Some("141")
+        );
+    }
+
+    #[test]
+    fn parses_color_formats() {
+        assert_eq!(parse_color("cyan"), Some("\x1b[1;36m".to_string()));
+        assert_eq!(parse_color("208"), Some("\x1b[38;5;208m".to_string()));
+        assert_eq!(
+            parse_color("#7aa2f7"),
+            Some("\x1b[38;2;122;162;247m".to_string())
+        );
+        assert_eq!(
+            parse_color("7aa2f7"),
+            Some("\x1b[38;2;122;162;247m".to_string())
+        );
+        assert_eq!(parse_color("auto"), None);
+        assert_eq!(parse_color("999"), None);
+    }
+
+    #[test]
+    fn parses_theme_config_with_overrides() {
+        let json_str = r##"{
+            "theme": {
+                "name": "nord",
+                "title": "#bf616a",
+                "separator": " -> "
+            }
+        }"##;
+        let cfg: Config = serde_json::from_str(json_str).unwrap();
+        let theme = cfg.theme.unwrap();
+        assert_eq!(theme.name.as_deref(), Some("nord"));
+        assert_eq!(theme.title.as_deref(), Some("#bf616a"));
+        assert_eq!(theme.separator.as_deref(), Some(" -> "));
+        assert!(theme.keys.is_none());
     }
 
     #[test]

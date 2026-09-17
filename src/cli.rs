@@ -12,6 +12,7 @@ pub struct CliOptions {
     pub gen_config: bool,
     pub list_logos: bool,
     pub list_modules: bool,
+    pub list_themes: bool,
     pub json: bool,
     pub help: bool,
     pub version: bool,
@@ -29,6 +30,7 @@ pub fn parse_cli(args: &[String]) -> Result<CliOptions, String> {
             "--gen-config" => opts.gen_config = true,
             "--list-logos" => opts.list_logos = true,
             "--list-modules" => opts.list_modules = true,
+            "--list-themes" => opts.list_themes = true,
             "-h" | "--help" => opts.help = true,
             "-v" | "--version" => opts.version = true,
             "--color" => {
@@ -114,6 +116,7 @@ pub fn print_help() {
     println!("    --gen-config           Print default JSON configuration to stdout");
     println!("    --list-logos           List all supported distro and OS logos");
     println!("    --list-modules         List all available information modules");
+    println!("    --list-themes          List all built-in color themes");
     println!("    --json                 Output system information in structured JSON format");
     println!("    -v, --version          Print version information");
     println!("    -h, --help             Print help information\n");
