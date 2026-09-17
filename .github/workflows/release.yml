@@ -42,7 +42,7 @@ jobs:
             asset_name: rustfetch-${{ github.ref_name }}-x86_64-pc-windows-msvc.zip
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
