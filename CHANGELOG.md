@@ -29,8 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Audio hardware detection via ALSA card procfs.
   - Network interface detection and local IPv4 CIDR resolution via `getifaddrs`.
   - Locale detection (`LC_ALL`, `LANG`, `LC_MESSAGES`).
-- 44+ authentic ASCII distro and OS logos with signatures ANSI colors:
-  - Ubuntu, Debian, Arch Linux, Fedora, NixOS, Alpine, Void, Gentoo, Linux Mint, Manjaro, Pop!_OS, openSUSE, Kali Linux, Red Hat, Rocky Linux, AlmaLinux, CentOS, Oracle Linux, Slackware, EndeavourOS, FreeBSD, OpenBSD, NetBSD, DragonFly BSD, Haiku, macOS, Windows, Android, Solus, Devuan, Artix, Garuda, Parrot, Mageia, Zorin, Guix, SteamOS, Tails, Raspberry Pi, generic Linux, Rust.
+- 45+ authentic ASCII distro and OS logos with signatures ANSI colors:
+  - Ubuntu, Debian, Arch Linux, Fedora, NixOS, Alpine, Void, Gentoo, Linux Mint, Manjaro, Pop!_OS, openSUSE, Kali Linux, Red Hat, Rocky Linux, AlmaLinux, CentOS, Oracle Linux, Slackware, EndeavourOS, FreeBSD, OpenBSD, NetBSD, DragonFly BSD, Haiku, macOS, Windows, Android, Solus, Devuan, Artix, Bedrock Linux, Garuda, Parrot, Mageia, Zorin, Guix, SteamOS, Tails, Raspberry Pi, generic Linux, Rust.
 - Rust 2024 Edition migration with stabilized let chains and zero-overhead match ergonomics.
 - Structured JSON output mode (`--json`) for automated pipelines and integrations.
 - Configurable module layout and ordering (`--structure <list>`).

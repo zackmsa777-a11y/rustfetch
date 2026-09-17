@@ -3,7 +3,7 @@
 # rustfetch
 
 **A blazingly fast, highly extensible system information fetch tool written in Rust.**
-*Full fastfetch parity • 44+ authentic distro logos • Real hardware probes • Zero runtime bloat*
+*Full fastfetch parity • 45+ authentic distro logos • Real hardware probes • Zero runtime bloat*
 
 [![CI](https://github.com/zackmsa777-a11y/rustfetch/actions/workflows/ci.yml/badge.svg)](https://github.com/zackmsa777-a11y/rustfetch/actions/workflows/ci.yml)
 [![Release](https://github.com/zackmsa777-a11y/rustfetch/actions/workflows/release.yml/badge.svg)](https://github.com/zackmsa777-a11y/rustfetch/releases)
@@ -43,7 +43,7 @@
 
 - **Blazingly Fast**: Executes in **< 5ms** using native Linux `procfs`, `sysfs`, and `libc` calls. No shell forks, no slow subcommands.
 - **Concurrent Multi-threaded Probes**: Hardware and environment modules run in parallel with scoped threads (`std::thread::scope`).
-- **44+ Distro and OS Logos**: Complete authentic ASCII art collection with accurate distro brand colors (Arch, NixOS, Fedora, Ubuntu, Debian, Alpine, Gentoo, macOS, Windows, and more).
+- **45+ Distro and OS Logos**: Complete authentic ASCII art collection with accurate distro brand colors (Arch, NixOS, Fedora, Ubuntu, Debian, Bedrock, Alpine, Gentoo, macOS, Windows, and more).
 - **Real System Detection**: Real hardware metrics—not hardcoded strings or mock prints. Accurately queries CPU, GPU, memory, swap, mount points, battery, displays, desktop environments, window managers, themes, fonts, and network interfaces.
 - **Structured JSON Output**: Full `--json` export for scripts, monitoring, dotfile automation, and integrations.
 - **JSONC Configuration**: Supports customizable layouts, module filters, and overrides via `~/.config/rustfetch/config.jsonc`.
@@ -149,6 +149,7 @@ Run `rustfetch --list-logos` to see all supported identifiers:
 | **Android** | `--logo android` | Android Green |
 | **Arch Linux** | `--logo arch` | Cyan |
 | **Artix Linux** | `--logo artix` | Artix Cyan |
+| **Bedrock Linux** | `--logo bedrock` | Bedrock White |
 | **CentOS** | `--logo centos` | CentOS Purple |
 | **Debian** | `--logo debian` | Debian Crimson |
 | **Devuan** | `--logo devuan` | Devuan Purple |

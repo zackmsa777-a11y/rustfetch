@@ -6,24 +6,46 @@ use std::process::Command;
 pub fn detect_packages() -> Option<String> {
     let mut counts = Vec::new();
 
-    if let Ok(content) = fs::read_to_string("/var/lib/dpkg/status") {
-        let count = content
-            .lines()
-            .filter(|l| l.starts_with("Status: install ok installed"))
-            .count();
-        if count > 0 {
-            counts.push(format!("{count} (dpkg)"));
+    let roots: Vec<std::path::PathBuf> = if let Ok(entries) = fs::read_dir("/bedrock/strata") {
+        let dirs: Vec<_> = entries
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.is_dir())
+            .collect();
+        if dirs.is_empty() {
+            vec![std::path::PathBuf::from("/")]
+        } else {
+            dirs
+        }
+    } else {
+        vec![std::path::PathBuf::from("/")]
+    };
+
+    let mut dpkg_count = 0;
+    for root in &roots {
+        if let Ok(content) = fs::read_to_string(root.join("var/lib/dpkg/status")) {
+            dpkg_count += content
+                .lines()
+                .filter(|l| l.starts_with("Status: install ok installed"))
+                .count();
         }
     }
-
-    if let Ok(entries) = fs::read_dir("/var/lib/pacman/local") {
-        let count = entries.flatten().filter(|e| e.path().is_dir()).count();
-        if count > 0 {
-            counts.push(format!("{count} (pacman)"));
-        }
+    if dpkg_count > 0 {
+        counts.push(format!("{dpkg_count} (dpkg)"));
     }
 
-    if Path::new("/var/lib/rpm").exists()
+    let mut pacman_count = 0;
+    for root in &roots {
+        if let Ok(entries) = fs::read_dir(root.join("var/lib/pacman/local")) {
+            pacman_count += entries.flatten().filter(|e| e.path().is_dir()).count();
+        }
+    }
+    if pacman_count > 0 {
+        counts.push(format!("{pacman_count} (pacman)"));
+    }
+
+    let has_rpm = roots.iter().any(|r| r.join("var/lib/rpm").exists());
+    if has_rpm
         && let Ok(output) = Command::new("rpm")
             .args(["-qa", "--nodigest", "--nosignature"])
             .output()
@@ -103,35 +125,43 @@ pub fn detect_packages() -> Option<String> {
         }
     }
 
-    if let Ok(content) = fs::read_to_string("/lib/apk/db/installed") {
-        let count = content.lines().filter(|l| l.starts_with("P:")).count();
-        if count > 0 {
-            counts.push(format!("{count} (apk)"));
+    let mut apk_count = 0;
+    for root in &roots {
+        if let Ok(content) = fs::read_to_string(root.join("lib/apk/db/installed")) {
+            apk_count += content.lines().filter(|l| l.starts_with("P:")).count();
         }
     }
+    if apk_count > 0 {
+        counts.push(format!("{apk_count} (apk)"));
+    }
 
-    if let Ok(entries) = fs::read_dir("/var/db/pkg") {
-        let mut count = 0;
-        for cat in entries.flatten() {
-            if cat.path().is_dir()
-                && let Ok(pkgs) = fs::read_dir(cat.path())
-            {
-                count += pkgs.flatten().filter(|p| p.path().is_dir()).count();
+    let mut emerge_count = 0;
+    for root in &roots {
+        if let Ok(entries) = fs::read_dir(root.join("var/db/pkg")) {
+            for cat in entries.flatten() {
+                if cat.path().is_dir()
+                    && let Ok(pkgs) = fs::read_dir(cat.path())
+                {
+                    emerge_count += pkgs.flatten().filter(|p| p.path().is_dir()).count();
+                }
             }
         }
-        if count > 0 {
-            counts.push(format!("{count} (emerge)"));
-        }
+    }
+    if emerge_count > 0 {
+        counts.push(format!("{emerge_count} (emerge)"));
     }
 
-    if let Ok(entries) = fs::read_dir("/var/db/xbps") {
-        let count = entries
-            .flatten()
-            .filter(|e| e.file_name().to_string_lossy().starts_with("pkg-"))
-            .count();
-        if count > 0 {
-            counts.push(format!("{count} (xbps)"));
+    let mut xbps_count = 0;
+    for root in &roots {
+        if let Ok(entries) = fs::read_dir(root.join("var/db/xbps")) {
+            xbps_count += entries
+                .flatten()
+                .filter(|e| e.file_name().to_string_lossy().starts_with("pkg-"))
+                .count();
         }
+    }
+    if xbps_count > 0 {
+        counts.push(format!("{xbps_count} (xbps)"));
     }
 
     let brew_dirs = [

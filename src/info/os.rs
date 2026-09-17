@@ -5,9 +5,17 @@ use std::fs;
 use std::path::Path;
 
 pub fn detect_os() -> (Option<String>, String, String) {
-    let os_release = fs::read_to_string("/etc/os-release")
-        .or_else(|_| fs::read_to_string("/usr/lib/os-release"))
-        .unwrap_or_default();
+    let bedrock_restricted = env::var("BEDROCK_RESTRICT")
+        .map(|v| v == "1")
+        .unwrap_or(false);
+    let os_release =
+        if !bedrock_restricted && Path::new("/bedrock/strata/bedrock/etc/os-release").exists() {
+            fs::read_to_string("/bedrock/strata/bedrock/etc/os-release").unwrap_or_default()
+        } else {
+            fs::read_to_string("/etc/os-release")
+                .or_else(|_| fs::read_to_string("/usr/lib/os-release"))
+                .unwrap_or_default()
+        };
 
     let raw_id = value(&os_release, "ID", '=').unwrap_or("").to_lowercase();
     let id_like = value(&os_release, "ID_LIKE", '=')
@@ -33,9 +41,12 @@ pub fn detect_os() -> (Option<String>, String, String) {
             "parrotos" => "parrot",
             "elementaryos" => "elementary",
             "mxlinux" => "mx",
+            "bedrock" | "bedrocklinux" => "bedrock",
             known => known,
         }
         .to_string()
+    } else if !bedrock_restricted && Path::new("/bedrock/etc/bedrock-release").exists() {
+        "bedrock".to_string()
     } else if Path::new("/etc/arch-release").exists() {
         "arch".to_string()
     } else if Path::new("/etc/debian_version").exists() {
@@ -85,9 +96,26 @@ pub fn detect_os() -> (Option<String>, String, String) {
         }
     };
 
+    let bedrock_release = if !bedrock_restricted
+        && (normalized_id == "bedrock" || Path::new("/bedrock/etc/bedrock-release").exists())
+    {
+        fs::read_to_string("/bedrock/etc/bedrock-release").ok()
+    } else {
+        None
+    };
+
     let distro_name = name
         .or(pretty_name)
-        .unwrap_or(normalized_id.as_str())
+        .or_else(|| {
+            bedrock_release
+                .as_deref()
+                .and_then(|c| c.lines().next().map(|l| l.trim()))
+        })
+        .unwrap_or(if normalized_id == "bedrock" {
+            "Bedrock Linux"
+        } else {
+            normalized_id.as_str()
+        })
         .to_string();
 
     let base = match (name, version, pretty_name) {
@@ -101,7 +129,14 @@ pub fn detect_os() -> (Option<String>, String, String) {
         (_, _, Some(p)) => p.to_string(),
         (Some(n), None, None) => n.to_string(),
         _ => {
-            if let Ok(issue) = fs::read_to_string("/etc/issue") {
+            if let Some(ref rel) = bedrock_release {
+                let first = rel.lines().next().unwrap_or("").trim();
+                if !first.is_empty() {
+                    first.to_string()
+                } else {
+                    distro_name.clone()
+                }
+            } else if let Ok(issue) = fs::read_to_string("/etc/issue") {
                 let first = issue.lines().next().unwrap_or("").trim();
                 let stripped = first
                     .replace("\\n", "")

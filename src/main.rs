@@ -237,6 +237,10 @@ mod tests {
 
     #[test]
     fn resolves_extended_distro_logos() {
+        let (bedrock, col) = get_logo("bedrock", false, None);
+        assert!(!bedrock.is_empty());
+        assert_eq!(col, "\x1b[1;37m");
+
         let (oracle, _) = get_logo("oracle", false, None);
         assert!(!oracle.is_empty());
 
