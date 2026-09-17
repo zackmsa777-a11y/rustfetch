@@ -1,15 +1,15 @@
 # Contributing to rustfetch
 
-First off, thank you for considering contributing to `rustfetch`! It is people like you that make `rustfetch` a great tool for the open-source community.
+Guidelines and standards for contributing to rustfetch.
 
 ---
 
-## 🛠️ Development Setup
+## Development Setup
 
 ### Prerequisites
 
-- **Rust toolchain** (version 1.70.0 or later, stable recommended)
-- **Cargo**, **clippy**, and **rustfmt**
+- Rust toolchain (version 1.70.0 or later, stable recommended)
+- Cargo, clippy, and rustfmt
 
 ```bash
 rustup update stable
@@ -27,10 +27,10 @@ cargo run
 
 ---
 
-## 📐 Coding Standards
+## Coding Standards
 
 1. **Zero Comment Rule in Source Files**:
-   Source files under `src/` must contain **0 code comments**. Code must be self-documenting with clear, expressive naming, small helper functions, and explicit type signatures.
+   Source files under `src/` must contain zero code comments. Code must be self-documenting with clear, expressive naming, small helper functions, and explicit type signatures.
 2. **Formatting**:
    Run `cargo fmt -- --check` before committing.
 3. **Lints**:
@@ -42,7 +42,7 @@ cargo run
 
 ---
 
-## 🎨 Adding a New Distro or OS Logo
+## Adding a New Distro or OS Logo
 
 1. Open `src/logos.rs`.
 2. Add your ASCII art array as a `pub const <DISTRO>_LOGO: &[&str] = &[ ... ];`.
@@ -52,7 +52,7 @@ cargo run
 
 ---
 
-## 📦 Adding a New Information Module
+## Adding a New Information Module
 
 1. Define the module probe in `src/info/<module>.rs`.
 2. Add the field to `SystemInfo` in `src/info/types.rs`.
@@ -62,7 +62,7 @@ cargo run
 
 ---
 
-## 🚀 Submitting a Pull Request
+## Submitting a Pull Request
 
 1. Fork the repository on GitHub.
 2. Create a feature branch: `git checkout -b feature/my-new-logo`.
