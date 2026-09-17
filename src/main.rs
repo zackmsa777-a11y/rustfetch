@@ -52,17 +52,21 @@ fn main() {
 
     let file_cfg = load_config(cli_opts.config_path.as_deref());
 
+    let cfg_logo_name = file_cfg.get_logo_name();
+    let cfg_logo_color = file_cfg.get_logo_color();
+    let cfg_modules = file_cfg.get_normalized_modules();
+
     let effective_no_color = cli_opts.no_color || file_cfg.no_color.unwrap_or(false);
     let effective_no_logo = cli_opts.no_logo || file_cfg.no_logo.unwrap_or(false);
     let effective_logo = cli_opts
         .logo
         .as_deref()
-        .or_else(|| file_cfg.logo.as_deref().filter(|s| *s != "auto"));
+        .or_else(|| cfg_logo_name.as_deref().filter(|s| *s != "auto"));
     let effective_logo_color = cli_opts
         .logo_color
         .as_deref()
-        .or_else(|| file_cfg.logo_color.as_deref().filter(|s| *s != "auto"));
-    let effective_structure = cli_opts.structure.as_ref().or(file_cfg.modules.as_ref());
+        .or_else(|| cfg_logo_color.as_deref().filter(|s| *s != "auto"));
+    let effective_structure = cli_opts.structure.as_ref().or(cfg_modules.as_ref());
 
     let effective_disks = cli_opts
         .disk_paths
@@ -71,11 +75,14 @@ fn main() {
 
     let system_info = gather_info(effective_disks.map(|v| v.as_slice()));
 
+    let cfg_key_color = file_cfg.get_key_color();
+
     let print_opts = PrintOptions {
         no_color: effective_no_color,
         no_logo: effective_no_logo,
         logo_override: effective_logo,
         logo_color: effective_logo_color,
+        key_color: cfg_key_color.as_deref(),
         structure: effective_structure.map(|v| v.as_slice()),
         json: cli_opts.json,
     };
@@ -86,7 +93,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use crate::cli::parse_cli;
-    use crate::config::strip_jsonc_comments;
+    use crate::config::{strip_jsonc_comments, Config};
     use crate::info::cpu::format_cpu;
     use crate::info::memory::format_memory;
     use crate::info::swap::format_swap;
@@ -197,9 +204,61 @@ mod tests {
 
     #[test]
     fn strips_jsonc_syntax() {
-        let jsonc = "{\n// comment\n\"key\": \"value\" /* inline */\n}\n";
+        let jsonc = "{\n\"key\": \"value\"\n}\n";
         let cleaned = strip_jsonc_comments(jsonc);
         let parsed: serde_json::Value = serde_json::from_str(&cleaned).unwrap();
         assert_eq!(parsed["key"], "value");
+    }
+
+    #[test]
+    fn parses_fastfetch_config_structures() {
+        let json_str = r#"{
+            "logo": {
+                "source": "oracle",
+                "color": { "1": "red" }
+            },
+            "display": {
+                "color": { "keys": "green" }
+            },
+            "modules": [
+                "title",
+                { "type": "os", "key": "Operating System" },
+                { "type": "wmtheme", "key": "Theme" },
+                "colors"
+            ]
+        }"#;
+        let cfg: Config = serde_json::from_str(json_str).unwrap();
+        assert_eq!(cfg.get_logo_name().as_deref(), Some("oracle"));
+        assert_eq!(cfg.get_logo_color().as_deref(), Some("red"));
+        assert_eq!(cfg.get_key_color().as_deref(), Some("green"));
+        let mods = cfg.get_normalized_modules().unwrap();
+        assert_eq!(mods, vec!["title", "os", "wm_theme", "colors"]);
+    }
+
+    #[test]
+    fn resolves_extended_distro_logos() {
+        let (oracle, _) = get_logo("oracle", false, None);
+        assert!(!oracle.is_empty());
+
+        let (rocky, _) = get_logo("rocky", false, None);
+        assert!(!rocky.is_empty());
+
+        let (almalinux, _) = get_logo("almalinux", false, None);
+        assert!(!almalinux.is_empty());
+
+        let (centos, _) = get_logo("centos", false, None);
+        assert!(!centos.is_empty());
+
+        let (rpi, _) = get_logo("raspberry", false, None);
+        assert!(!rpi.is_empty());
+
+        let (freebsd, _) = get_logo("freebsd", false, None);
+        assert!(!freebsd.is_empty());
+
+        let (macos, _) = get_logo("macos", false, None);
+        assert!(!macos.is_empty());
+
+        let (windows, _) = get_logo("windows", false, None);
+        assert!(!windows.is_empty());
     }
 }

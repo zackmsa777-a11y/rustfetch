@@ -1,38 +1,116 @@
 {
-  "$schema": "https://raw.githubusercontent.com/zackmsa777-a11y/rustfetch/master/schema/config.json",
-  "logo": "auto",
-  "logo_color": "auto",
-  "no_logo": false,
-  "no_color": false,
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    "source": "auto",
+    "color": {
+      "1": "auto"
+    }
+  },
+  "display": {
+    "separator": ": ",
+    "color": {
+      "keys": "auto"
+    }
+  },
   "modules": [
     "title",
     "separator",
-    "os",
-    "host",
-    "kernel",
-    "uptime",
-    "packages",
-    "shell",
-    "display",
-    "de",
-    "wm",
-    "wm_theme",
-    "theme",
-    "icons",
-    "font",
-    "cursor",
-    "terminal",
-    "terminal_font",
-    "cpu",
-    "gpu",
-    "memory",
-    "swap",
-    "disk",
-    "battery",
-    "power_adapter",
-    "audio",
-    "local_ip",
-    "locale",
+    {
+      "key": "OS",
+      "type": "os"
+    },
+    {
+      "key": "Host",
+      "type": "host"
+    },
+    {
+      "key": "Kernel",
+      "type": "kernel"
+    },
+    {
+      "key": "Uptime",
+      "type": "uptime"
+    },
+    {
+      "key": "Packages",
+      "type": "packages"
+    },
+    {
+      "key": "Shell",
+      "type": "shell"
+    },
+    {
+      "key": "Display",
+      "type": "display"
+    },
+    {
+      "key": "DE",
+      "type": "de"
+    },
+    {
+      "key": "WM",
+      "type": "wm"
+    },
+    {
+      "key": "Theme",
+      "type": "theme"
+    },
+    {
+      "key": "Icons",
+      "type": "icons"
+    },
+    {
+      "key": "Font",
+      "type": "font"
+    },
+    {
+      "key": "Cursor",
+      "type": "cursor"
+    },
+    {
+      "key": "Terminal",
+      "type": "terminal"
+    },
+    {
+      "key": "Terminal Font",
+      "type": "terminalfont"
+    },
+    {
+      "key": "CPU",
+      "type": "cpu"
+    },
+    {
+      "key": "GPU",
+      "type": "gpu"
+    },
+    {
+      "key": "Memory",
+      "type": "memory"
+    },
+    {
+      "key": "Swap",
+      "type": "swap"
+    },
+    {
+      "key": "Disk",
+      "type": "disk"
+    },
+    {
+      "key": "Battery",
+      "type": "battery"
+    },
+    {
+      "key": "Power Adapter",
+      "type": "poweradapter"
+    },
+    {
+      "key": "Local IP",
+      "type": "localip"
+    },
+    {
+      "key": "Locale",
+      "type": "locale"
+    },
     "break",
     "colors"
   ],

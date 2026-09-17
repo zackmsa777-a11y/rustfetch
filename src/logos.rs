@@ -141,12 +141,12 @@ pub const MINT_LOGO: &[&str] = &[
 ];
 
 pub const MANJARO_LOGO: &[&str] = &[
-    "███████╗ ██████████╗ ██████████╗",
-    "██╔════╝ ██╔═══════╝ ██╔═══════╝",
-    "███████╗ ██║         ██║",
-    "╚════██║ ██║         ██║",
-    "███████║ ██║         ██║",
-    "╚══════╝ ╚═╝         ╚═╝",
+    "||||||||| |||||||||||| ||||||||||||",
+    "||        ||           ||",
+    "||||||||| ||           ||",
+    "        || ||           ||",
+    "||||||||| ||           ||",
+    "||||||||| ||           ||",
 ];
 
 pub const POP_LOGO: &[&str] = &[
@@ -204,6 +204,216 @@ pub const REDHAT_LOGO: &[&str] = &[
     "    .MMMMMMMMMMMMMMMMMMMMMMMMM:",
     "      .MMMMMMMMMMMMMMMMMMMMMM",
     "         MMMMMMMMMMMMMMMMMM",
+];
+
+pub const CENTOS_LOGO: &[&str] = &[
+    "                 ..",
+    "               .PLガイド.",
+    "             :PLCガイドPLC:",
+    "     .       .PLCガイドPLC.       .",
+    "    .PL:.      .PLCPLC.      .:PL.",
+    "    .PLCPL:.    .PLC.    .:PLCPLL.",
+    "    .PLCPLCPLC:  ..  :PLCPLCPLC.",
+    "    .PLCPLCPLCPLC..PLCPLCPLCPLC.",
+    "    .PLCPLCPLC:  ..  :PLCPLCPLC.",
+    "    .PLCPL:.    .PLC.    .:PLCPLL.",
+    "    .PL:.      .PLCPLC.      .:PL.",
+    "     .       .PLCガイドPLC.       .",
+    "             :PLCガイドPLC:",
+    "               .PLガイド.",
+    "                 ..",
+];
+
+pub const ROCKY_LOGO: &[&str] = &[
+    "         .---.",
+    "       .'     '.",
+    "      /  .-.    \\",
+    "     |  /   \\    |",
+    "     |  \\   /    |",
+    "      \\  '-'    /",
+    "       '.     .'",
+    "         '---'",
+];
+
+pub const ALMALINUX_LOGO: &[&str] = &[
+    "         .-'''''-.",
+    "       .'         '.",
+    "      /   .-----.   \\",
+    "     |   /       \\   |",
+    "     |   \\       /   |",
+    "      \\   '-----'   /",
+    "       '.         .'",
+    "         '-.....-'",
+];
+
+pub const ORACLE_LOGO: &[&str] = &[
+    "  _______________________",
+    " /                       \\",
+    "|   ___________________   |",
+    "|  /                   \\  |",
+    "|  |   ORACLE LINUX    |  |",
+    "|  \\___________________/  |",
+    "|                         |",
+    " \\_______________________/",
+];
+
+pub const RASPBERRY_LOGO: &[&str] = &[
+    "   .~~.   .~~.",
+    "  '. \\ ' ' / .'",
+    "   .~ .~~~..~.",
+    "  : .~.'~'.~. :",
+    " ~ (   ) (   ) ~",
+    "( : '~'.~.'~' : )",
+    " ~ .~ (   ) ~. ~",
+    "  (  : '~' :  )",
+    "   '~ .~~~. ~'",
+    "       '~'",
+];
+
+pub const GARUDA_LOGO: &[&str] = &[
+    "                    .---.",
+    "                   /     \\",
+    "                  / /\\ /\\ \\",
+    "                 | |  |  | |",
+    "             .---' |  |  | '---.",
+    "            / .--. \\  |  / .--. \\",
+    "            | |   '.\\_|_/.'   | |",
+    "            \\ \\              / /",
+    "             '--.__________.'--'",
+];
+
+pub const ARTIX_LOGO: &[&str] = &[
+    "                   /\\",
+    "                  /  \\",
+    "                 /`'.,\\",
+    "                /     ',",
+    "               /      ,`\\",
+    "              /   ,.'`.  \\",
+    "             /.,'`     `'.\\",
+];
+
+pub const PARROT_LOGO: &[&str] = &[
+    "  .---.",
+    " /     \\",
+    "| () () |",
+    " \\  ^  /",
+    "  |||||",
+    "  |||||",
+];
+
+pub const ZORIN_LOGO: &[&str] = &[
+    "        '//////",
+    "       '//////",
+    "      '//////",
+    "     '//////",
+    "    '//////",
+    "   '//////",
+    "  '//////",
+];
+
+pub const ELEMENTARY_LOGO: &[&str] = &[
+    "  _______",
+    " / ____  \\",
+    "/ /    \\  \\",
+    "| |     | |",
+    "\\ \\____/  /",
+    " \\_______/",
+];
+
+pub const STEAMOS_LOGO: &[&str] = &[
+    "      .---.",
+    "     /     \\",
+    "    |  (O)  |",
+    "     \\     /---.",
+    "  .---'---'     \\",
+    " /     \\   (O)   |",
+    "|  (O)  |       /",
+    " \\     / '-----'",
+    "  '---'",
+];
+
+pub const TAILS_LOGO: &[&str] = &[
+    "    _ _",
+    "   /   \\",
+    "  /  /\\ \\",
+    " /  /  \\ \\",
+    "|  |    | |",
+    " \\  \\  / /",
+    "  \\  \\/ /",
+    "   \\_ _/",
+];
+
+pub const GUIX_LOGO: &[&str] = &[
+    "|.__          __.|",
+    "|__ \\        / __|",
+    "   \\ \\      / /",
+    "    \\ \\    / /",
+    "     \\ \\  / /",
+    "      \\ \\/ /",
+    "       \\__/",
+];
+
+pub const SOLUS_LOGO: &[&str] = &[
+    "      /|",
+    "     / |",
+    "    /  |",
+    "   /   |",
+    "  /____|",
+    " |\\____/",
+];
+
+pub const MX_LOGO: &[&str] = &["\\\\  //", " \\\\//", "  //\\\\", " //  \\\\"];
+
+pub const DEVUAN_LOGO: &[&str] = &[
+    "  ..,,;;;:::..,",
+    "           `':;c.",
+    "              `lxO.",
+    "                ,:ld;",
+    "                  ,dK",
+    "              ..;clc.",
+];
+
+pub const MAGEIA_LOGO: &[&str] = &[
+    "   *   ", "  ***  ", " ***** ", "   *   ", " /~~~\\ ", "(     )", " \\___/ ",
+];
+
+pub const OPENBSD_LOGO: &[&str] = &["      ____", "    \\(@|@)/", "   ==\\_T_/==", "      / \\"];
+
+pub const NETBSD_LOGO: &[&str] = &[
+    "\\\\\\`-._           __..--''/",
+    " \\\\\\   `-._   _.-'        /",
+    "  \\\\\\      `./           /",
+    "   \\\\\\                  /",
+    "    \\\\\\                /",
+    "     \\\\\\              /",
+    "      \\\\\\            /",
+];
+
+pub const DRAGONFLY_LOGO: &[&str] = &[
+    "    ,~~.",
+    "    (  )><",
+    "     \\/",
+    "     /\\",
+    "    (  )><",
+    "    '~~'",
+];
+
+pub const HAIKU_LOGO: &[&str] = &[
+    " _   _       _ _          ",
+    "| | | | __ _(_) | ___   _ ",
+    "| |_| |/ _` | | |/ / | | |",
+    "|  _  | (_| | |   <| |_| |",
+    "|_| |_|\\__,_|_|_|\\_\\\\__,_|",
+];
+
+pub const SOLARIS_LOGO: &[&str] = &[
+    "       .---.",
+    "      /     \\",
+    "  .---| SUN |---.",
+    " /    \\     /    \\",
+    "|      '---'      |",
+    " \\               /",
+    "  '-------------'",
 ];
 
 pub const SLACKWARE_LOGO: &[&str] = &[
@@ -315,28 +525,50 @@ pub const RUST_LOGO: &[&str] = &[
 ];
 
 pub const ALL_LOGOS: &[&str] = &[
-    "ubuntu",
-    "debian",
-    "arch",
-    "fedora",
-    "nixos",
+    "almalinux",
     "alpine",
-    "void",
-    "gentoo",
-    "mint",
-    "manjaro",
-    "pop",
-    "opensuse",
-    "kali",
-    "redhat",
-    "slackware",
-    "endeavouros",
-    "freebsd",
-    "macos",
-    "windows",
     "android",
+    "arch",
+    "artix",
+    "centos",
+    "debian",
+    "devuan",
+    "dragonfly",
+    "elementary",
+    "endeavouros",
+    "fedora",
+    "freebsd",
+    "garuda",
+    "gentoo",
+    "guix",
+    "haiku",
+    "kali",
     "linux",
+    "mageia",
+    "manjaro",
+    "macos",
+    "mint",
+    "mx",
+    "netbsd",
+    "nixos",
+    "openbsd",
+    "opensuse",
+    "oracle",
+    "parrot",
+    "pop",
+    "raspberry",
+    "redhat",
+    "rocky",
     "rust",
+    "slackware",
+    "solaris",
+    "solus",
+    "steamos",
+    "tails",
+    "ubuntu",
+    "void",
+    "windows",
+    "zorin",
 ];
 
 pub fn get_logo(
@@ -362,10 +594,32 @@ pub fn get_logo(
             (OPENSUSE_LOGO, "\x1b[1;32m")
         }
         "kali" => (KALI_LOGO, "\x1b[1;34m"),
-        "redhat" | "rhel" | "centos" | "rocky" | "almalinux" => (REDHAT_LOGO, "\x1b[1;31m"),
+        "redhat" | "rhel" => (REDHAT_LOGO, "\x1b[1;31m"),
+        "centos" => (CENTOS_LOGO, "\x1b[1;35m"),
+        "rocky" | "rockylinux" => (ROCKY_LOGO, "\x1b[1;32m"),
+        "almalinux" | "alma" => (ALMALINUX_LOGO, "\x1b[1;34m"),
+        "oracle" | "ol" => (ORACLE_LOGO, "\x1b[1;31m"),
+        "raspberry" | "raspbian" => (RASPBERRY_LOGO, "\x1b[1;31m"),
+        "garuda" => (GARUDA_LOGO, "\x1b[1;36m"),
+        "artix" => (ARTIX_LOGO, "\x1b[1;36m"),
+        "parrot" | "parrotos" => (PARROT_LOGO, "\x1b[1;36m"),
+        "zorin" | "zorinos" => (ZORIN_LOGO, "\x1b[1;34m"),
+        "elementary" | "elementaryos" => (ELEMENTARY_LOGO, "\x1b[1;34m"),
+        "steamos" => (STEAMOS_LOGO, "\x1b[1;34m"),
+        "tails" => (TAILS_LOGO, "\x1b[1;35m"),
+        "guix" => (GUIX_LOGO, "\x1b[1;33m"),
+        "solus" => (SOLUS_LOGO, "\x1b[1;34m"),
+        "mx" | "mxlinux" => (MX_LOGO, "\x1b[1;37m"),
+        "devuan" => (DEVUAN_LOGO, "\x1b[1;35m"),
+        "mageia" => (MAGEIA_LOGO, "\x1b[1;36m"),
         "slackware" => (SLACKWARE_LOGO, "\x1b[1;34m"),
         "endeavouros" => (ENDEAVOUROS_LOGO, "\x1b[1;35m"),
         "freebsd" => (FREEBSD_LOGO, "\x1b[1;31m"),
+        "openbsd" => (OPENBSD_LOGO, "\x1b[1;33m"),
+        "netbsd" => (NETBSD_LOGO, "\x1b[1;33m"),
+        "dragonfly" | "dragonflybsd" => (DRAGONFLY_LOGO, "\x1b[1;31m"),
+        "haiku" => (HAIKU_LOGO, "\x1b[1;33m"),
+        "solaris" | "sunos" | "illumos" => (SOLARIS_LOGO, "\x1b[1;33m"),
         "macos" | "darwin" | "apple" => (MACOS_LOGO, "\x1b[1;37m"),
         "windows" | "win" => (WINDOWS_LOGO, "\x1b[1;36m"),
         "android" => (ANDROID_LOGO, "\x1b[1;32m"),

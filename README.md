@@ -144,28 +144,50 @@ Run `rustfetch --list-logos` to see all supported identifiers:
 
 | Distro / OS | Logo Flag | Signature Color |
 | :--- | :--- | :--- |
-| **Ubuntu** | `--logo ubuntu` | Bright Red / Orange |
-| **Debian** | `--logo debian` | Debian Crimson |
-| **Arch Linux** | `--logo arch` | Cyan |
-| **Fedora** | `--logo fedora` | Fedora Blue |
-| **NixOS** | `--logo nixos` | Light Cyan |
+| **AlmaLinux** | `--logo almalinux` | Alma Blue |
 | **Alpine Linux** | `--logo alpine` | Alpine Blue |
-| **Void Linux** | `--logo void` | Void Green |
-| **Gentoo** | `--logo gentoo` | Gentoo Purple |
-| **Linux Mint** | `--logo mint` | Mint Green |
-| **Manjaro** | `--logo manjaro` | Forest Green |
-| **Pop!_OS** | `--logo pop` | Cyan |
-| **openSUSE** | `--logo opensuse` | Gecko Green |
-| **Kali Linux** | `--logo kali` | Kali Blue |
-| **Red Hat / RHEL** | `--logo redhat` | Red Hat Red |
-| **Slackware** | `--logo slackware` | Dark Blue |
-| **EndeavourOS** | `--logo endeavouros` | Magenta |
-| **FreeBSD** | `--logo freebsd` | FreeBSD Red |
-| **macOS** | `--logo macos` | Apple White |
-| **Windows** | `--logo windows` | Windows Cyan |
 | **Android** | `--logo android` | Android Green |
-| **Generic Linux (Tux)** | `--logo linux` | Tux Yellow |
+| **Arch Linux** | `--logo arch` | Cyan |
+| **Artix Linux** | `--logo artix` | Artix Cyan |
+| **CentOS** | `--logo centos` | CentOS Purple |
+| **Debian** | `--logo debian` | Debian Crimson |
+| **Devuan** | `--logo devuan` | Devuan Purple |
+| **DragonFly BSD** | `--logo dragonfly` | Red |
+| **elementary OS** | `--logo elementary` | Blue |
+| **EndeavourOS** | `--logo endeavouros` | Magenta |
+| **Fedora** | `--logo fedora` | Fedora Blue |
+| **FreeBSD** | `--logo freebsd` | FreeBSD Red |
+| **Garuda Linux** | `--logo garuda` | Garuda Cyan |
+| **Gentoo** | `--logo gentoo` | Gentoo Purple |
+| **GNU Guix** | `--logo guix` | Guix Yellow |
+| **Haiku** | `--logo haiku` | Haiku Yellow |
+| **Kali Linux** | `--logo kali` | Kali Blue |
+| **Linux Mint** | `--logo mint` | Mint Green |
+| **Mageia** | `--logo mageia` | Mageia Blue |
+| **Manjaro** | `--logo manjaro` | Forest Green |
+| **macOS** | `--logo macos` | Apple White |
+| **MX Linux** | `--logo mx` | White |
+| **NetBSD** | `--logo netbsd` | NetBSD Orange |
+| **NixOS** | `--logo nixos` | Light Cyan |
+| **OpenBSD** | `--logo openbsd` | OpenBSD Yellow |
+| **openSUSE** | `--logo opensuse` | Gecko Green |
+| **Oracle Linux** | `--logo oracle` | Oracle Red |
+| **Parrot OS** | `--logo parrot` | Parrot Cyan |
+| **Pop!_OS** | `--logo pop` | Cyan |
+| **Raspberry Pi OS** | `--logo raspberry` | Raspberry Red |
+| **Red Hat / RHEL** | `--logo redhat` | Red Hat Red |
+| **Rocky Linux** | `--logo rocky` | Rocky Green |
 | **Rust (Ferris)** | `--logo rust` | Rust Orange |
+| **Slackware** | `--logo slackware` | Dark Blue |
+| **Solaris / Illumos** | `--logo solaris` | Sun Yellow |
+| **Solus** | `--logo solus` | Solus Blue |
+| **SteamOS** | `--logo steamos` | Steam Blue |
+| **Tails** | `--logo tails` | Tails Purple |
+| **Ubuntu** | `--logo ubuntu` | Bright Red / Orange |
+| **Void Linux** | `--logo void` | Void Green |
+| **Windows** | `--logo windows` | Windows Cyan |
+| **Zorin OS** | `--logo zorin` | Zorin Blue |
+| **Generic Linux (Tux)** | `--logo linux` | Tux Yellow |
 
 ---
 
@@ -210,10 +232,11 @@ Run `rustfetch --list-modules` to see the complete module catalog:
 
 ## Configuration (`config.jsonc`)
 
-`rustfetch` checks for a configuration file in:
+`rustfetch` uses the standard fastfetch JSON/JSONC configuration schema and automatically looks for configs in:
 1. `--config <path>`
 2. `$XDG_CONFIG_HOME/rustfetch/config.jsonc`
 3. `~/.config/rustfetch/config.jsonc`
+4. `~/.config/fastfetch/config.jsonc` (fastfetch fallback)
 
 Generate a template configuration with:
 
@@ -225,29 +248,46 @@ rustfetch --gen-config > ~/.config/rustfetch/config.jsonc
 
 ```jsonc
 {
-  "logo": "auto",
-  "logo_color": "auto",
-  "no_logo": false,
-  "no_color": false,
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    "source": "auto",
+    "color": {
+      "1": "auto"
+    }
+  },
+  "display": {
+    "separator": ": ",
+    "color": {
+      "keys": "auto"
+    }
+  },
   "modules": [
     "title",
     "separator",
-    "os",
-    "host",
-    "kernel",
-    "uptime",
-    "packages",
-    "shell",
-    "display",
-    "terminal",
-    "cpu",
-    "gpu",
-    "memory",
-    "swap",
-    "disk",
-    "battery",
-    "local_ip",
-    "locale",
+    { "type": "os", "key": "OS" },
+    { "type": "host", "key": "Host" },
+    { "type": "kernel", "key": "Kernel" },
+    { "type": "uptime", "key": "Uptime" },
+    { "type": "packages", "key": "Packages" },
+    { "type": "shell", "key": "Shell" },
+    { "type": "display", "key": "Display" },
+    { "type": "de", "key": "DE" },
+    { "type": "wm", "key": "WM" },
+    { "type": "theme", "key": "Theme" },
+    { "type": "icons", "key": "Icons" },
+    { "type": "font", "key": "Font" },
+    { "type": "cursor", "key": "Cursor" },
+    { "type": "terminal", "key": "Terminal" },
+    { "type": "terminalfont", "key": "Terminal Font" },
+    { "type": "cpu", "key": "CPU" },
+    { "type": "gpu", "key": "GPU" },
+    { "type": "memory", "key": "Memory" },
+    { "type": "swap", "key": "Swap" },
+    { "type": "disk", "key": "Disk" },
+    { "type": "battery", "key": "Battery" },
+    { "type": "poweradapter", "key": "Power Adapter" },
+    { "type": "localip", "key": "Local IP" },
+    { "type": "locale", "key": "Locale" },
     "break",
     "colors"
   ],

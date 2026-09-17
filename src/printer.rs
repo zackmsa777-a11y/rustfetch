@@ -7,6 +7,7 @@ pub struct PrintOptions<'a> {
     pub no_logo: bool,
     pub logo_override: Option<&'a str>,
     pub logo_color: Option<&'a str>,
+    pub key_color: Option<&'a str>,
     pub structure: Option<&'a [String]>,
     pub json: bool,
 }
@@ -250,8 +251,25 @@ pub fn print_fetch(info: &SystemInfo, opts: &PrintOptions) {
 
     let logo_key = opts.logo_override.unwrap_or(info.distro_id.as_str());
 
-    let (logo_lines, key_color) = get_logo(logo_key, opts.no_color, opts.logo_color);
-    let info_lines = format_module_lines(info, opts.no_color, key_color, opts.structure);
+    let (logo_lines, default_key_color) = get_logo(logo_key, opts.no_color, opts.logo_color);
+    let resolved_key_color = if opts.no_color {
+        ""
+    } else if let Some(k) = opts.key_color {
+        match k.to_lowercase().as_str() {
+            "black" => "\x1b[1;30m",
+            "red" => "\x1b[1;31m",
+            "green" => "\x1b[1;32m",
+            "yellow" => "\x1b[1;33m",
+            "blue" => "\x1b[1;34m",
+            "magenta" | "purple" => "\x1b[1;35m",
+            "cyan" => "\x1b[1;36m",
+            "white" => "\x1b[1;37m",
+            _ => default_key_color,
+        }
+    } else {
+        default_key_color
+    };
+    let info_lines = format_module_lines(info, opts.no_color, resolved_key_color, opts.structure);
 
     if opts.no_logo {
         for line in info_lines {
