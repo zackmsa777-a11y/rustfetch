@@ -3,6 +3,7 @@ mod banner;
 mod cli;
 mod config;
 mod info;
+mod kitty;
 mod logos;
 mod presets;
 mod printer;
@@ -175,6 +176,51 @@ fn main() {
     if let Some(lcol) = effective_logo_color {
         style.logo_color = Some(lcol.to_string());
     }
+
+    let cfg_logo_type = file_cfg.get_logo_type();
+    let effective_logo_type = cli_opts
+        .logo_type
+        .clone()
+        .or(style.logo_type.clone())
+        .or(cfg_logo_type);
+    if let Some(t) = effective_logo_type {
+        style.logo_type = Some(t);
+    }
+
+    let cfg_logo_width = file_cfg.get_logo_width();
+    let effective_logo_width = cli_opts.logo_width.or(style.logo_width).or(cfg_logo_width);
+    if let Some(w) = effective_logo_width {
+        style.logo_width = Some(w);
+    }
+
+    let cfg_logo_height = file_cfg.get_logo_height();
+    let effective_logo_height = cli_opts
+        .logo_height
+        .or(style.logo_height)
+        .or(cfg_logo_height);
+    if let Some(h) = effective_logo_height {
+        style.logo_height = Some(h);
+    }
+
+    if let Some(p) = cli_opts.logo_padding_top {
+        style.padding_top = p;
+    }
+    if let Some(p) = cli_opts.logo_padding_left {
+        style.padding_left = p;
+    }
+    if let Some(p) = cli_opts.logo_padding_right {
+        style.padding_right = p;
+    } else if let Some(cfg_pad) = file_cfg.get_logo_padding() {
+        if cli_opts.logo_padding_top.is_none() && cfg_pad.top > 0 {
+            style.padding_top = cfg_pad.top;
+        }
+        if cli_opts.logo_padding_left.is_none() && cfg_pad.left > 0 {
+            style.padding_left = cfg_pad.left;
+        }
+        if cli_opts.logo_padding_right.is_none() && cfg_pad.right > 0 {
+            style.padding_right = cfg_pad.right;
+        }
+    }
     if let Some(structure) = effective_structure {
         style.modules = Some(
             structure
@@ -231,6 +277,26 @@ mod tests {
             opts.structure.unwrap(),
             vec!["title".to_string(), "os".to_string(), "kernel".to_string()]
         );
+    }
+
+    #[test]
+    fn parses_kitty_image_flags() {
+        let args = vec![
+            "--kitty".to_string(),
+            "/path/to/logo.png".to_string(),
+            "--logo-width".to_string(),
+            "35".to_string(),
+            "--logo-height".to_string(),
+            "18".to_string(),
+            "--logo-padding-left".to_string(),
+            "2".to_string(),
+        ];
+        let opts = parse_cli(&args).unwrap();
+        assert_eq!(opts.logo.as_deref(), Some("/path/to/logo.png"));
+        assert_eq!(opts.logo_type.as_deref(), Some("kitty"));
+        assert_eq!(opts.logo_width, Some(35));
+        assert_eq!(opts.logo_height, Some(18));
+        assert_eq!(opts.logo_padding_left, Some(2));
     }
 
     #[test]

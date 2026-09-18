@@ -4,6 +4,12 @@ use std::path::PathBuf;
 pub struct CliOptions {
     pub logo: Option<String>,
     pub logo_color: Option<String>,
+    pub logo_type: Option<String>,
+    pub logo_width: Option<usize>,
+    pub logo_height: Option<usize>,
+    pub logo_padding_top: Option<usize>,
+    pub logo_padding_left: Option<usize>,
+    pub logo_padding_right: Option<usize>,
     pub no_logo: bool,
     pub no_color: bool,
     pub structure: Option<Vec<String>>,
@@ -79,6 +85,106 @@ pub fn parse_cli(args: &[String]) -> Result<CliOptions, String> {
                     return Err("--logo-color requires a color name".into());
                 }
             }
+            "--kitty" => {
+                if let Some(val) = iter.next() {
+                    opts.logo = Some(val.clone());
+                    opts.logo_type = Some("kitty".into());
+                } else {
+                    return Err("--kitty requires an image file path".into());
+                }
+            }
+            "--kitty-direct" => {
+                if let Some(val) = iter.next() {
+                    opts.logo = Some(val.clone());
+                    opts.logo_type = Some("kitty-direct".into());
+                } else {
+                    return Err("--kitty-direct requires an image file path".into());
+                }
+            }
+            "--kitty-icat" => {
+                if let Some(val) = iter.next() {
+                    opts.logo = Some(val.clone());
+                    opts.logo_type = Some("kitty-icat".into());
+                } else {
+                    return Err("--kitty-icat requires an image file path".into());
+                }
+            }
+            "--logo-type" => {
+                if let Some(val) = iter.next() {
+                    opts.logo_type = Some(val.to_lowercase());
+                } else {
+                    return Err("--logo-type requires a type name (kitty|kitty-direct|kitty-icat|file|builtin|auto)".into());
+                }
+            }
+            "--logo-width" => {
+                if let Some(val) = iter.next() {
+                    match val.parse::<usize>() {
+                        Ok(w) => opts.logo_width = Some(w),
+                        Err(_) => return Err("--logo-width requires a positive integer".into()),
+                    }
+                } else {
+                    return Err("--logo-width requires a number".into());
+                }
+            }
+            "--logo-height" => {
+                if let Some(val) = iter.next() {
+                    match val.parse::<usize>() {
+                        Ok(h) => opts.logo_height = Some(h),
+                        Err(_) => return Err("--logo-height requires a positive integer".into()),
+                    }
+                } else {
+                    return Err("--logo-height requires a number".into());
+                }
+            }
+            "--logo-padding" => {
+                if let Some(val) = iter.next() {
+                    match val.parse::<usize>() {
+                        Ok(p) => {
+                            opts.logo_padding_left = Some(p);
+                            opts.logo_padding_right = Some(p);
+                        }
+                        Err(_) => return Err("--logo-padding requires a positive integer".into()),
+                    }
+                } else {
+                    return Err("--logo-padding requires a number".into());
+                }
+            }
+            "--logo-padding-left" => {
+                if let Some(val) = iter.next() {
+                    match val.parse::<usize>() {
+                        Ok(p) => opts.logo_padding_left = Some(p),
+                        Err(_) => {
+                            return Err("--logo-padding-left requires a positive integer".into());
+                        }
+                    }
+                } else {
+                    return Err("--logo-padding-left requires a number".into());
+                }
+            }
+            "--logo-padding-right" => {
+                if let Some(val) = iter.next() {
+                    match val.parse::<usize>() {
+                        Ok(p) => opts.logo_padding_right = Some(p),
+                        Err(_) => {
+                            return Err("--logo-padding-right requires a positive integer".into());
+                        }
+                    }
+                } else {
+                    return Err("--logo-padding-right requires a number".into());
+                }
+            }
+            "--logo-padding-top" => {
+                if let Some(val) = iter.next() {
+                    match val.parse::<usize>() {
+                        Ok(p) => opts.logo_padding_top = Some(p),
+                        Err(_) => {
+                            return Err("--logo-padding-top requires a positive integer".into());
+                        }
+                    }
+                } else {
+                    return Err("--logo-padding-top requires a number".into());
+                }
+            }
             "--structure" => {
                 if let Some(val) = iter.next() {
                     let mods: Vec<String> = val
@@ -125,6 +231,14 @@ pub fn print_help() {
     println!("OPTIONS:");
     println!("    --logo <NAME>          Specify a custom distro or OS logo");
     println!("    --logo-color <COLOR>   Override the logo primary ANSI color");
+    println!(
+        "    --logo-type <TYPE>     Logo type: kitty, kitty-direct, kitty-icat, file, builtin, auto"
+    );
+    println!("    --kitty <PATH>         Display an image logo using the Kitty graphics protocol");
+    println!("    --kitty-direct <PATH>  Display an image using direct Kitty file transfer");
+    println!("    --kitty-icat <PATH>    Display an image via kitten icat tool");
+    println!("    --logo-width <NUM>     Width in terminal cells for image logos");
+    println!("    --logo-height <NUM>    Height in terminal cells for image logos");
     println!("    --no-logo              Hide the ASCII distro logo");
     println!("    --no-color             Disable ANSI terminal colors");
     println!("    --color <MODE>         Color output mode (always, auto, never)");

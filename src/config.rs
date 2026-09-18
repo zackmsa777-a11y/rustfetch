@@ -9,7 +9,16 @@ pub enum LogoSetting {
     Name(String),
     Object {
         source: Option<String>,
+        #[serde(default, rename = "type")]
+        logo_type: Option<String>,
+        #[serde(default)]
         color: Option<serde_json::Value>,
+        #[serde(default)]
+        width: Option<usize>,
+        #[serde(default)]
+        height: Option<usize>,
+        #[serde(default)]
+        padding: Option<Padding>,
     },
 }
 
@@ -21,8 +30,14 @@ pub enum LogoDef {
     Name(String),
     Object {
         source: Option<String>,
+        #[serde(default, rename = "type")]
+        logo_type: Option<String>,
         #[serde(default)]
         art: Option<String>,
+        #[serde(default)]
+        width: Option<usize>,
+        #[serde(default)]
+        height: Option<usize>,
         #[serde(default)]
         padding: Option<Padding>,
     },
@@ -35,6 +50,27 @@ impl LogoDef {
         match self {
             LogoDef::Name(s) => Some(s.as_str()),
             LogoDef::Object { source, art, .. } => source.as_deref().or(art.as_deref()),
+        }
+    }
+
+    pub fn logo_type(&self) -> Option<&str> {
+        match self {
+            LogoDef::Name(_) => None,
+            LogoDef::Object { logo_type, .. } => logo_type.as_deref(),
+        }
+    }
+
+    pub fn width(&self) -> Option<usize> {
+        match self {
+            LogoDef::Name(_) => None,
+            LogoDef::Object { width, .. } => *width,
+        }
+    }
+
+    pub fn height(&self) -> Option<usize> {
+        match self {
+            LogoDef::Name(_) => None,
+            LogoDef::Object { height, .. } => *height,
         }
     }
 
@@ -56,6 +92,8 @@ impl LogoDef {
 pub struct Padding {
     #[serde(default)]
     pub top: usize,
+    #[serde(default)]
+    pub left: usize,
     #[serde(default)]
     pub right: usize,
 }
@@ -687,6 +725,34 @@ impl Config {
             Some(LogoSetting::Name(n)) => Some(n.clone()),
             Some(LogoSetting::Object { source, .. }) => source.clone(),
             None => None,
+        }
+    }
+
+    pub fn get_logo_type(&self) -> Option<String> {
+        match &self.logo {
+            Some(LogoSetting::Object { logo_type, .. }) => logo_type.clone(),
+            _ => None,
+        }
+    }
+
+    pub fn get_logo_width(&self) -> Option<usize> {
+        match &self.logo {
+            Some(LogoSetting::Object { width, .. }) => *width,
+            _ => None,
+        }
+    }
+
+    pub fn get_logo_height(&self) -> Option<usize> {
+        match &self.logo {
+            Some(LogoSetting::Object { height, .. }) => *height,
+            _ => None,
+        }
+    }
+
+    pub fn get_logo_padding(&self) -> Option<Padding> {
+        match &self.logo {
+            Some(LogoSetting::Object { padding, .. }) => *padding,
+            _ => None,
         }
     }
 

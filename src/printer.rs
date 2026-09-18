@@ -12,7 +12,11 @@ pub struct RenderStyle {
     /// Logo name, ASCII-art path, `art:<name>`, `auto`, or `none`.
     pub logo: Option<String>,
     pub logo_color: Option<String>,
+    pub logo_type: Option<String>,
+    pub logo_width: Option<usize>,
+    pub logo_height: Option<usize>,
     pub padding_top: usize,
+    pub padding_left: usize,
     pub padding_right: usize,
     pub key_color: Option<String>,
     pub title_color: Option<String>,
@@ -36,15 +40,20 @@ pub fn style_from_theme(def: &ThemeDef) -> RenderStyle {
 
     if let Some(logo) = def.logo.as_ref() {
         style.logo = logo.source().map(|s| s.to_string());
+        style.logo_type = logo.logo_type().map(|s| s.to_string());
+        style.logo_width = logo.width();
+        style.logo_height = logo.height();
         if logo.is_hidden() {
             style.no_logo = true;
         }
         let padding = logo.padding();
         style.padding_top = padding.top;
+        style.padding_left = padding.left;
         style.padding_right = padding.right;
     }
     if let Some(padding) = def.padding {
         style.padding_top = padding.top;
+        style.padding_left = padding.left;
         style.padding_right = padding.right;
     }
 
@@ -472,11 +481,52 @@ pub fn format_module_lines(
 
 /// Render logo + module column as it will be printed.
 pub fn render_lines(info: &SystemInfo, style: &RenderStyle) -> Vec<String> {
-    let art = resolve_logo(style.logo.as_deref(), &info.distro_id);
-    let show_logo = !style.no_logo && !art.is_empty();
+    let show_logo = !style.no_logo;
     let module_lines = format_styled_module_lines(info, style);
 
     if !show_logo {
+        return module_lines;
+    }
+
+    // Check if this should be rendered using Kitty Graphics Protocol (Image)
+    let is_kitty_requested = matches!(
+        style.logo_type.as_deref(),
+        Some("kitty") | Some("kitty-direct") | Some("kitty-icat")
+    );
+    let logo_str = style.logo.as_deref().unwrap_or("");
+    let is_img = crate::kitty::is_image_path(logo_str);
+    let terminal_is_kitty = crate::kitty::supports_kitty_graphics();
+
+    if !style.no_color
+        && (is_kitty_requested
+            || (is_img
+                && (terminal_is_kitty
+                    || style.logo_type.is_none()
+                    || style.logo_type.as_deref() == Some("auto"))))
+    {
+        let expanded = crate::config::expand_tilde(logo_str);
+        if expanded.exists() {
+            let direct = style.logo_type.as_deref() == Some("kitty-direct");
+            let icat = style.logo_type.as_deref() == Some("kitty-icat");
+            let kitty_opts = crate::kitty::KittyImageOptions {
+                req_w: style.logo_width,
+                req_h: style.logo_height,
+                padding_top: style.padding_top,
+                padding_left: style.padding_left,
+                padding_right: style.padding_right,
+                direct,
+                icat,
+            };
+            if let Ok(lines) =
+                crate::kitty::render_kitty_image_lines(&expanded, &kitty_opts, &module_lines)
+            {
+                return lines;
+            }
+        }
+    }
+
+    let art = resolve_logo(style.logo.as_deref(), &info.distro_id);
+    if art.is_empty() {
         return module_lines;
     }
 
@@ -491,15 +541,16 @@ pub fn render_lines(info: &SystemInfo, style: &RenderStyle) -> Vec<String> {
     top_pad.extend(logo_lines);
 
     let gap = " ".repeat(style.padding_right.max(3));
+    let left_pad = " ".repeat(style.padding_left);
     let total = top_pad.len().max(module_lines.len());
     let mut out = Vec::with_capacity(total);
     for i in 0..total {
         let logo_part = match top_pad.get(i) {
             Some(line) => {
                 let pad = max_logo_width.saturating_sub(visible_width(line));
-                format!("{line}{}{gap}", " ".repeat(pad))
+                format!("{left_pad}{line}{}{gap}", " ".repeat(pad))
             }
-            None => " ".repeat(max_logo_width + gap.len()),
+            None => format!("{left_pad}{}", " ".repeat(max_logo_width + gap.len())),
         };
         match module_lines.get(i) {
             Some(line) => out.push(format!("{logo_part}{line}")),

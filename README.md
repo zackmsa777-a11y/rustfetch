@@ -49,6 +49,7 @@
 - **Concurrent Multi-threaded Probes**: Hardware and environment modules run in parallel with scoped threads (`std::thread::scope`).
 - **Real System Detection**: Real hardware metrics—not hardcoded strings or mock prints. Accurately queries CPU, GPU, memory, swap, mount points, battery, displays, desktop environments, window managers, themes, fonts, and network interfaces.
 - **Structured JSON & Config Export**: Full `--json` export for scripts and monitoring, plus instant `[e]` export from the TUI to save any theme as custom JSONC to `~/.config/rustfetch/config.jsonc`.
+- **Kitty Graphics Protocol & Image Logos**: High-resolution image rendering using the native Kitty Graphics Protocol (`t=f` file mode and `t=d` chunked direct transfer) supported in Kitty, Ghostty, and WezTerm. Includes header dimension probing (PNG, JPEG, GIF, WebP), automatic aspect ratio preservation, and customizable cell width/height and padding.
 - **Pure Self-Documenting Architecture**: Built with zero source-code comments for maximum cleanliness and maintainability.
 
 ---
@@ -145,6 +146,15 @@ OPTIONS:
     --preview-themes       Print a live preview of every theme
     --logo <NAME>          Specify a custom distro or OS logo
     --logo-color <COLOR>   Override the logo primary ANSI color
+    --logo-type <TYPE>     Logo type: kitty, kitty-direct, kitty-icat, file, builtin, auto
+    --kitty <PATH>         Display an image logo using the Kitty graphics protocol
+    --kitty-direct <PATH>  Display an image using direct Kitty file transfer
+    --kitty-icat <PATH>    Display an image via kitten icat tool
+    --logo-width <NUM>     Target width in terminal character cells for image logo
+    --logo-height <NUM>    Target height in terminal character cells for image logo
+    --logo-padding <NUM>   Horizontal gap between image logo and module lines
+    --logo-padding-left <NUM>  Left padding spaces before the image
+    --logo-padding-top <NUM>   Top padding empty lines before image and text
     --no-logo              Hide the ASCII distro logo
     --no-color             Disable ANSI terminal colors
     --color <MODE>         Color output mode (always, auto, never)
@@ -167,6 +177,13 @@ rustfetch
 
 # Launch interactive visual setup TUI
 rustfetch --setup
+
+# Display high-resolution image logo via Kitty Graphics Protocol
+rustfetch --kitty ~/Pictures/avatar.png
+rustfetch --kitty ~/Pictures/wallpaper.png --logo-width 36 --logo-padding 4
+
+# Direct transmission mode (works over SSH or inside containers without shared filesystem)
+rustfetch --kitty-direct ~/Pictures/logo.png
 
 # Try a theme once without modifying configuration
 rustfetch --theme groups
@@ -432,6 +449,27 @@ rustfetch --gen-config > ~/.config/rustfetch/config.jsonc
     "colors"
   ],
   "disk_paths": ["/"]
+}
+```
+
+### Kitty Image Logo Configuration
+
+To render a high-resolution image logo in Kitty, Ghostty, or WezTerm via `config.jsonc`:
+
+```jsonc
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    "source": "~/Pictures/avatar.png",
+    "type": "kitty",
+    "width": 32,
+    "height": 16,
+    "padding": {
+      "top": 1,
+      "left": 1,
+      "right": 3
+    }
+  }
 }
 ```
 
