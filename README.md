@@ -42,11 +42,13 @@
 ## Highlights
 
 - **Blazingly Fast**: Executes in **< 5ms** using native Linux `procfs`, `sysfs`, and `libc` calls. No shell forks, no slow subcommands.
+- **Interactive Full-Screen Setup TUI (`--setup`)**: Visually browse, preview, and apply 50+ themes with real-time hardware metrics. Features split-screen live preview, full mouse click & scroll wheel support, and zero-latency unbuffered raw input.
+- **Distro-Aware Rice Intelligence**: Automatically inspects `/etc/os-release` and surfaces recommended rice presets tailored to your distribution (Ubuntu, Arch, CachyOS, Gentoo, Bedrock, Fedora, Debian, NixOS, Mint, and more) flagged with `[rec]`.
+- **50+ Built-in Themes & Layouts**: Tree branch graphs, compact card frames, retro amber CRT, neon cyberpunk, matrix rain, quiet monochrome paper, and iconic palettes (Catppuccin Mocha/Macchiato, Tokyo Night, Dracula, Nord, Gruvbox, Everforest, Synthwave '84, Monokai Pro, One Dark).
+- **Authentic Fastfetch ASCII Logos**: 45+ pixel-perfect logos matching Fastfetch, compiled directly into Rust with accurate brand colors and automatic runtime fallback. Clean terminal aesthetics with zero emojis.
 - **Concurrent Multi-threaded Probes**: Hardware and environment modules run in parallel with scoped threads (`std::thread::scope`).
-- **45+ Distro and OS Logos**: Complete authentic ASCII art collection with accurate distro brand colors (Arch, NixOS, Fedora, Ubuntu, Debian, Bedrock, Alpine, Gentoo, macOS, Windows, and more).
 - **Real System Detection**: Real hardware metrics—not hardcoded strings or mock prints. Accurately queries CPU, GPU, memory, swap, mount points, battery, displays, desktop environments, window managers, themes, fonts, and network interfaces.
-- **Structured JSON Output**: Full `--json` export for scripts, monitoring, dotfile automation, and integrations.
-- **JSONC Configuration**: Supports customizable layouts, module filters, and overrides via `~/.config/rustfetch/config.jsonc`.
+- **Structured JSON & Config Export**: Full `--json` export for scripts and monitoring, plus instant `[e]` export from the TUI to save any theme as custom JSONC to `~/.config/rustfetch/config.jsonc`.
 - **Pure Self-Documenting Architecture**: Built with zero source-code comments for maximum cleanliness and maintainability.
 
 ---
@@ -68,7 +70,7 @@ Measured on a standard Linux workstation (average of 50 runs):
 
 ### Requirements (source builds)
 
-- **Rust 1.88+** (edition 2024 + let-chains). Older toolchains fail with `E0658`.
+- **Rust 1.88+** (edition 2024 + let-chains).
 - Recommended: install via [rustup](https://rustup.rs/) and keep `stable` updated.
 
 ### Prebuilt Binary (recommended)
@@ -77,9 +79,9 @@ Measured on a standard Linux workstation (average of 50 runs):
 curl -sSL https://raw.githubusercontent.com/zackmsa777-a11y/rustfetch/master/install.sh | bash
 ```
 
-The installer picks the latest GitHub Release asset for your OS/arch (musl, gnu, or darwin), validates the download is a real gzip archive (so HTML 404 pages are not fed to `tar`), and falls back to `cargo install --git` if no matching asset exists.
+The installer picks the latest GitHub Release asset for your OS/arch (musl, gnu, or darwin), validates the download archive, and falls back to `cargo install --git` if no matching asset exists.
 
-You can also grab archives from [GitHub Releases](https://github.com/zackmsa777-a11y/rustfetch/releases/latest).
+You can also grab release archives directly from [GitHub Releases](https://github.com/zackmsa777-a11y/rustfetch/releases/latest).
 
 ### Cargo via Git
 
@@ -92,8 +94,40 @@ cargo install --git https://github.com/zackmsa777-a11y/rustfetch.git
 ```bash
 git clone https://github.com/zackmsa777-a11y/rustfetch.git
 cd rustfetch
-cargo install --path .
+cargo build --release
+cp target/release/rustfetch ~/.cargo/bin/
 ```
+
+---
+
+## Interactive Setup TUI (`--setup`)
+
+Launch the visual theme and layout configurator:
+
+```bash
+rustfetch --setup
+# or
+rustfetch --themes
+```
+
+The TUI provides an interactive split-pane interface:
+- **Left Pane**: Scrollable catalog of available themes. Distro-specific themes matching your current operating system are pinned at the top with a `rec` tag.
+- **Right Pane**: Instant real-time live preview of how your terminal will look with the selected theme, rendered using your actual hardware metrics.
+
+### Controls & Mouse Navigation
+
+| Input | Action |
+| :--- | :--- |
+| **`Mouse Click`** | Click any theme in the list to select and preview it; click footer buttons to Apply, Export, or Quit |
+| **`Mouse Scroll`** | Scroll wheel up / down through the theme catalog |
+| **`↑` / `k`** or **`↓` / `j`** | Navigate up / down one theme |
+| **`PageUp`** / **`PageDown`** | Jump 5 themes up / down |
+| **`Home` / `g`** or **`End` / `G`** | Jump to top / bottom of catalog |
+| **`Enter`** | **Apply & Save** selected theme to `~/.config/rustfetch/config.jsonc` |
+| **`e`** | **Export** theme to `~/.config/rustfetch/config.jsonc` as a custom theme |
+| **`q`** / **`Esc`** / **`Ctrl+C`** | Exit without saving changes |
+
+> **Non-Interactive Fallback**: When stdout/stdin is redirected or not a TTY (e.g. piped or automated), `rustfetch --setup` gracefully falls back to a clean numbered command-line prompt.
 
 ---
 
@@ -104,6 +138,11 @@ USAGE:
     rustfetch [OPTIONS]
 
 OPTIONS:
+    --setup, --themes      Interactive full-screen theme & layout setup TUI
+    --theme <NAME>         Use a theme once without saving
+    --set-theme <NAME>     Save a theme as default in the config file
+    --list-themes          List all available color themes and layouts
+    --preview-themes       Print a live preview of every theme
     --logo <NAME>          Specify a custom distro or OS logo
     --logo-color <COLOR>   Override the logo primary ANSI color
     --no-logo              Hide the ASCII distro logo
@@ -126,19 +165,113 @@ OPTIONS:
 # Default auto-detected fetch
 rustfetch
 
-# Force a specific distro logo (e.g. Arch, NixOS, or Rust)
+# Launch interactive visual setup TUI
+rustfetch --setup
+
+# Try a theme once without modifying configuration
+rustfetch --theme groups
+rustfetch --theme catppuccin-mocha
+rustfetch --theme cachyos-speed
+
+# Permanently set default theme in ~/.config/rustfetch/config.jsonc
+rustfetch --set-theme tokyo-night
+
+# List all available built-in and user themes
+rustfetch --list-themes
+
+# Force a specific distro logo (e.g. Arch, CachyOS, Gentoo, Bedrock, or Ferris)
 rustfetch --logo arch
-rustfetch --logo nixos
+rustfetch --logo cachyos
+rustfetch --logo gentoo
+rustfetch --logo bedrock
 rustfetch --logo rust
 
 # Select custom modules and ordering
 rustfetch --structure title:os:kernel:cpu:gpu:memory:disk:colors
 
-# Output raw JSON for scripting
+# Output raw JSON for scripting or monitoring
 rustfetch --json | jq .cpu
 
 # Minimal fetch with no logo
 rustfetch --no-logo
+```
+
+---
+
+## Themes & Distro Ricing
+
+`rustfetch` comes with 50+ built-in presets covering major distributions, community desktop rices, and legendary colorways.
+
+### Distro-Specific Themes
+- **Ubuntu**: `ubuntu-classic`, `ubuntu-modern`, `ubuntu-tree`, `ubuntu-minimal`, `ubuntu-mini`
+- **Arch Linux**: `arch-clean`
+- **CachyOS**: `cachyos-speed` (x86-64-v3/v4 teal & cyan layout)
+- **Bedrock Linux**: `bedrock-strata` (multi-distro meta layout with silver accents)
+- **Gentoo**: `gentoo-purple` (compiled-from-source purple & lavender aesthetic)
+- **Debian**: `debian-swirl` (classic ruby swirl & soft white)
+- **Fedora**: `fedora-blue` (navy & ocean blue with double-colon keys)
+- **NixOS**: `nixos-snowflake` (glacial cyan snowflake motif)
+- **Linux Mint**: `mint-fresh` (fresh mint green & silver leaf elegance)
+- **openSUSE**: `opensuse-geek` (gecko green & rolling chameleon speed)
+- **Pop!_OS**: `pop-cosmic` (cosmic teal & amber accents)
+- **Void Linux**: `void-xbps` (runit fast, xbps green & graphite precision)
+- **Alpine Linux**: `alpine-peak` (ultra-lightweight alpine blue & summit white)
+- **Manjaro**: `manjaro-teal` (signature dark teal & neon emerald flow)
+- **Kali Linux**: `kali-dragon` (security dragon deep cobalt & obsidian cyan)
+- **EndeavourOS**: `endeavour-space` (interstellar violet, magenta & cosmic orange)
+- **RHEL**: `redhat-shadow` (corporate crimson shadow)
+
+### Layout Styles & Terminal Rices
+- **`groups`**: Grouped tree branches with glyph connectors (`├─`, `└─`).
+- **`hypr`**: Colour-dot bar framing a compact block layout.
+- **`rice`**: Card frame with rule lines, bracketed labels, and piped values.
+- **`cyber`**: Neon cyan on magenta with arrow keys and glowing block marks.
+- **`retro`**: Amber CRT terminal aesthetics with prompt art and double-colon keys.
+- **`matrix`**: Terminal green digital rain motif.
+- **`paper`**: Quiet monochrome with soft grey keys and middle-dot separators.
+- **`minimal`**: Single-column four-letter abbreviations with rainbow palette.
+- **`ferris-crab`**: Rustacean mascot ASCII art with fiery rust tones.
+- **`tux-penguin`**: Classic Linux Tux art in clean monochrome.
+
+### Community Color Palettes
+- **Catppuccin**: `catppuccin-mocha`, `catppuccin-macchiato`
+- **Tokyo Night**: `tokyo-night`
+- **Dracula**: `dracula`
+- **Nord**: `nord`
+- **Gruvbox**: `gruvbox`
+- **Everforest**: `everforest`
+- **Solarized**: `solarized-dark`
+- **Synthwave '84**: `synthwave-84`
+- **Monokai Pro**: `monokai-pro`
+- **One Dark**: `one-dark`
+
+### Custom Theme Files
+Drop any `.jsonc` theme into `~/.config/rustfetch/themes/<name>.jsonc`:
+
+```jsonc
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "display": {
+    "separator": " -> ",
+    "color": {
+      "keys": "magenta",
+      "title": "bright_cyan"
+    }
+  },
+  "modules": [
+    "title",
+    "separator",
+    { "type": "os", "key": "os" },
+    { "type": "cpu", "key": "cpu" },
+    { "type": "memory", "key": "ram" },
+    "colors"
+  ]
+}
+```
+
+Run your custom theme instantly:
+```bash
+rustfetch --theme <name>
 ```
 
 ---
@@ -155,6 +288,7 @@ Run `rustfetch --list-logos` to see all supported identifiers:
 | **Arch Linux** | `--logo arch` | Cyan |
 | **Artix Linux** | `--logo artix` | Artix Cyan |
 | **Bedrock Linux** | `--logo bedrock` | Bedrock White |
+| **CachyOS** | `--logo cachyos` | Cyan / Emerald |
 | **CentOS** | `--logo centos` | CentOS Purple |
 | **Debian** | `--logo debian` | Debian Crimson |
 | **Devuan** | `--logo devuan` | Devuan Purple |
