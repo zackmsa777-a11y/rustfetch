@@ -122,6 +122,16 @@ pub enum ModuleSetting {
         format: Option<String>,
         #[serde(default, rename = "keyWidth", alias = "key_width")]
         key_width: Option<usize>,
+        #[serde(default)]
+        command: Option<String>,
+        #[serde(default)]
+        text: Option<String>,
+        #[serde(default)]
+        shell: Option<bool>,
+        #[serde(default, rename = "timeout", alias = "timeoutMs", alias = "timeout_ms")]
+        timeout_ms: Option<u64>,
+        #[serde(default, rename = "showFailure", alias = "show_failure")]
+        show_failure: Option<bool>,
     },
 }
 
@@ -137,13 +147,35 @@ impl ModuleSetting {
 }
 
 /// Resolved, render-ready module entry.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ModuleSpec {
     pub kind: String,
     pub key: Option<String>,
     pub key_color: Option<String>,
     pub format: Option<String>,
     pub key_width: Option<usize>,
+    pub command: Option<String>,
+    pub text: Option<String>,
+    pub shell: bool,
+    pub timeout_ms: u64,
+    pub show_failure: bool,
+}
+
+impl Default for ModuleSpec {
+    fn default() -> Self {
+        Self {
+            kind: String::new(),
+            key: None,
+            key_color: None,
+            format: None,
+            key_width: None,
+            command: None,
+            text: None,
+            shell: false,
+            timeout_ms: crate::info::command::DEFAULT_TIMEOUT_MS,
+            show_failure: false,
+        }
+    }
 }
 
 impl From<&ModuleSetting> for ModuleSpec {
@@ -159,12 +191,22 @@ impl From<&ModuleSetting> for ModuleSpec {
                 key_color,
                 format,
                 key_width,
+                command,
+                text,
+                shell,
+                timeout_ms,
+                show_failure,
             } => ModuleSpec {
                 kind: normalize_module_name(module_type),
                 key: key.clone(),
                 key_color: key_color.clone(),
                 format: format.clone(),
                 key_width: *key_width,
+                command: command.clone(),
+                text: text.clone(),
+                shell: shell.unwrap_or(false),
+                timeout_ms: timeout_ms.unwrap_or(crate::info::command::DEFAULT_TIMEOUT_MS),
+                show_failure: show_failure.unwrap_or(false),
             },
         }
     }
@@ -178,6 +220,8 @@ pub fn normalize_module_name(name: &str) -> String {
         "poweradapter" => "power_adapter".into(),
         "localip" => "local_ip".into(),
         "publicip" => "public_ip".into(),
+        "exec" => "command".into(),
+        "static" => "custom".into(),
         other => other.to_string(),
     }
 }
@@ -191,6 +235,10 @@ pub struct DisplaySetting {
     pub color: Option<serde_json::Value>,
     pub separator: Option<String>,
     pub key: Option<serde_json::Value>,
+    /// When true, print info modules with empty/blank values.
+    /// Default false (omit empties in human output). JSON output is unaffected.
+    #[serde(default, rename = "showEmpty", alias = "show_empty")]
+    pub show_empty: Option<bool>,
 }
 
 /// A complete theme: colours *and* layout.
@@ -810,6 +858,7 @@ impl Config {
     }
 
     /// Config-declared layout as normalized module names (legacy/backward compatibility).
+    #[allow(dead_code)]
     pub fn get_normalized_modules(&self) -> Option<Vec<String>> {
         let raw_modules = self.modules.as_ref()?;
         let mut list = Vec::new();
@@ -827,6 +876,8 @@ impl Config {
                 "poweradapter" => "power_adapter",
                 "localip" => "local_ip",
                 "publicip" => "public_ip",
+                "exec" => "command",
+                "static" => "custom",
                 other => other,
             };
 
@@ -837,7 +888,6 @@ impl Config {
     }
 
     /// Config-declared layout as render-ready specs.
-    #[allow(dead_code)]
     pub fn get_modules(&self) -> Option<Vec<ModuleSpec>> {
         self.modules.as_deref().map(modules_to_specs)
     }
@@ -1017,7 +1067,8 @@ pub fn generate_default_config() -> String {
             "separator": ": ",
             "color": {
                 "keys": "auto"
-            }
+            },
+            "showEmpty": false
         },
         // Active theme: built-in preset name, or the full object form below.
         // Themes carry layout (logo, padding, module order, per-module keys and
@@ -1084,4 +1135,485 @@ pub fn generate_default_config() -> String {
     });
 
     serde_json::to_string_pretty(&default_cfg).unwrap_or_default()
+}
+
+const SUPPORTED_MODULES: &[&str] = &[
+    "title",
+    "separator",
+    "os",
+    "host",
+    "kernel",
+    "uptime",
+    "packages",
+    "shell",
+    "display",
+    "de",
+    "wm",
+    "wm_theme",
+    "theme",
+    "icons",
+    "font",
+    "cursor",
+    "terminal",
+    "terminal_font",
+    "cpu",
+    "gpu",
+    "memory",
+    "swap",
+    "disk",
+    "battery",
+    "power_adapter",
+    "audio",
+    "local_ip",
+    "public_ip",
+    "locale",
+    "command",
+    "custom",
+    "break",
+    "colors",
+];
+
+const MAPPED_TOP_LEVEL: &[&str] = &[
+    "$schema",
+    "logo",
+    "logo_color",
+    "no_logo",
+    "no_color",
+    "display",
+    "theme",
+    "themes",
+    "themes_dir",
+    "modules",
+    "disk_paths",
+    "color_keys",
+];
+
+const MAPPED_LOGO_KEYS: &[&str] = &["source", "type", "color", "width", "height", "padding"];
+const MAPPED_DISPLAY_KEYS: &[&str] = &["separator", "color", "key", "showEmpty", "show_empty"];
+const MAPPED_MODULE_KEYS: &[&str] = &[
+    "type",
+    "key",
+    "keyColor",
+    "key_color",
+    "format",
+    "keyWidth",
+    "key_width",
+    "folders",
+    "command",
+    "text",
+    "shell",
+    "timeout",
+    "timeoutMs",
+    "timeout_ms",
+    "showFailure",
+    "show_failure",
+];
+
+fn is_supported_module(kind: &str) -> bool {
+    SUPPORTED_MODULES.contains(&kind)
+}
+
+/// Default search paths for a fastfetch config to import.
+pub fn find_fastfetch_config_path() -> Option<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Ok(base) = env::var("XDG_CONFIG_HOME") {
+        candidates.push(Path::new(&base).join("fastfetch/config.jsonc"));
+        candidates.push(Path::new(&base).join("fastfetch/config.json"));
+    }
+    if let Ok(home) = env::var("HOME") {
+        candidates.push(Path::new(&home).join(".config/fastfetch/config.jsonc"));
+        candidates.push(Path::new(&home).join(".config/fastfetch/config.json"));
+    }
+
+    candidates.into_iter().find(|p| p.exists())
+}
+
+/// Result of mapping a fastfetch config into rustfetch form.
+#[derive(Debug, Clone)]
+pub struct FastfetchImport {
+    pub config: serde_json::Value,
+    pub mapped_modules: usize,
+    pub warnings: Vec<String>,
+    pub disk_paths: Option<Vec<String>>,
+}
+
+fn map_logo_value(logo: &serde_json::Value, warnings: &mut Vec<String>) -> serde_json::Value {
+    match logo {
+        serde_json::Value::String(_) => logo.clone(),
+        serde_json::Value::Object(map) => {
+            let mut out = serde_json::Map::new();
+            for (k, v) in map {
+                if MAPPED_LOGO_KEYS.contains(&k.as_str()) {
+                    out.insert(k.clone(), v.clone());
+                } else {
+                    warnings.push(format!("unmapped logo key '{k}' (ignored)"));
+                }
+            }
+            serde_json::Value::Object(out)
+        }
+        other => {
+            warnings.push(format!("unsupported logo value type ({other}), ignored"));
+            serde_json::Value::Null
+        }
+    }
+}
+
+fn map_display_value(display: &serde_json::Value, warnings: &mut Vec<String>) -> serde_json::Value {
+    let Some(map) = display.as_object() else {
+        warnings.push("unsupported display value (ignored)".into());
+        return serde_json::Value::Null;
+    };
+    let mut out = serde_json::Map::new();
+    for (k, v) in map {
+        if MAPPED_DISPLAY_KEYS.contains(&k.as_str()) {
+            out.insert(k.clone(), v.clone());
+        } else {
+            warnings.push(format!("unmapped display key '{k}' (ignored)"));
+        }
+    }
+    serde_json::Value::Object(out)
+}
+
+fn map_module_entry(
+    entry: &serde_json::Value,
+    warnings: &mut Vec<String>,
+    disk_paths: &mut Option<Vec<String>>,
+) -> Option<serde_json::Value> {
+    match entry {
+        serde_json::Value::String(name) => {
+            let kind = normalize_module_name(name);
+            if is_supported_module(&kind) {
+                Some(serde_json::Value::String(kind))
+            } else {
+                warnings.push(format!("unmapped module '{name}' (ignored)"));
+                None
+            }
+        }
+        serde_json::Value::Object(map) => {
+            let raw_type = map
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            if raw_type.is_empty() {
+                warnings.push("module object missing 'type' (ignored)".into());
+                return None;
+            }
+            let kind = normalize_module_name(&raw_type);
+            if !is_supported_module(&kind) {
+                warnings.push(format!("unmapped module '{raw_type}' (ignored)"));
+                return None;
+            }
+
+            for (k, _) in map {
+                if !MAPPED_MODULE_KEYS.contains(&k.as_str()) {
+                    warnings.push(format!(
+                        "unmapped module key '{k}' on '{raw_type}' (ignored)"
+                    ));
+                }
+            }
+
+            if let Some(folders) = map.get("folders").and_then(|v| v.as_array()) {
+                let paths: Vec<String> = folders
+                    .iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect();
+                if !paths.is_empty() {
+                    match disk_paths {
+                        Some(existing) => {
+                            for p in paths {
+                                if !existing.contains(&p) {
+                                    existing.push(p);
+                                }
+                            }
+                        }
+                        None => *disk_paths = Some(paths),
+                    }
+                }
+            }
+
+            let mut out = serde_json::Map::new();
+            out.insert("type".into(), serde_json::Value::String(kind.clone()));
+            if let Some(key) = map.get("key") {
+                out.insert("key".into(), key.clone());
+            }
+            if let Some(kc) = map.get("keyColor").or_else(|| map.get("key_color")) {
+                out.insert("keyColor".into(), kc.clone());
+            }
+            if let Some(fmt) = map.get("format") {
+                out.insert("format".into(), fmt.clone());
+            }
+            if let Some(kw) = map.get("keyWidth").or_else(|| map.get("key_width")) {
+                out.insert("keyWidth".into(), kw.clone());
+            }
+            if kind == "command" {
+                if let Some(cmd) = map.get("command") {
+                    out.insert("command".into(), cmd.clone());
+                } else if let Some(text) = map.get("text") {
+                    out.insert("command".into(), text.clone());
+                }
+                if let Some(text) = map.get("text") {
+                    out.insert("text".into(), text.clone());
+                }
+            } else if let Some(text) = map.get("text") {
+                out.insert("text".into(), text.clone());
+            }
+            if let Some(cmd) = map.get("command")
+                && kind != "command"
+            {
+                out.insert("command".into(), cmd.clone());
+            }
+            if let Some(shell) = map.get("shell") {
+                out.insert("shell".into(), shell.clone());
+            }
+            if let Some(t) = map
+                .get("timeout")
+                .or_else(|| map.get("timeoutMs"))
+                .or_else(|| map.get("timeout_ms"))
+            {
+                out.insert("timeout".into(), t.clone());
+            }
+            if let Some(sf) = map.get("showFailure").or_else(|| map.get("show_failure")) {
+                out.insert("showFailure".into(), sf.clone());
+            }
+            Some(serde_json::Value::Object(out))
+        }
+        other => {
+            warnings.push(format!("unsupported module entry ({other}), ignored"));
+            None
+        }
+    }
+}
+
+/// Parse a fastfetch JSON/JSONC document and map supported keys into rustfetch form.
+pub fn map_fastfetch_config(raw: &str) -> Result<FastfetchImport, String> {
+    let stripped = strip_jsonc_comments(raw);
+    let value: serde_json::Value =
+        serde_json::from_str(&stripped).map_err(|e| format!("invalid JSON/JSONC: {e}"))?;
+    let obj = value
+        .as_object()
+        .ok_or_else(|| "config root must be a JSON object".to_string())?;
+
+    let mut warnings = Vec::new();
+    let mut out = serde_json::Map::new();
+    let mut disk_paths: Option<Vec<String>> = None;
+
+    for key in obj.keys() {
+        if !MAPPED_TOP_LEVEL.contains(&key.as_str()) {
+            warnings.push(format!("unmapped key '{key}' (ignored)"));
+        }
+    }
+
+    out.insert(
+        "$schema".into(),
+        serde_json::json!(
+            "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json"
+        ),
+    );
+
+    if let Some(logo) = obj.get("logo") {
+        let mapped = map_logo_value(logo, &mut warnings);
+        if !mapped.is_null() {
+            out.insert("logo".into(), mapped);
+        }
+    }
+    if let Some(v) = obj.get("logo_color") {
+        out.insert("logo_color".into(), v.clone());
+    }
+    if let Some(v) = obj.get("no_logo") {
+        out.insert("no_logo".into(), v.clone());
+    }
+    if let Some(v) = obj.get("no_color") {
+        out.insert("no_color".into(), v.clone());
+    }
+    if let Some(v) = obj.get("color_keys") {
+        out.insert("color_keys".into(), v.clone());
+    }
+    if let Some(display) = obj.get("display") {
+        let mapped = map_display_value(display, &mut warnings);
+        if !mapped.is_null() {
+            out.insert("display".into(), mapped);
+        }
+    }
+    if let Some(v) = obj.get("theme") {
+        out.insert("theme".into(), v.clone());
+    }
+    if let Some(v) = obj.get("themes") {
+        out.insert("themes".into(), v.clone());
+    }
+    if let Some(v) = obj.get("themes_dir") {
+        out.insert("themes_dir".into(), v.clone());
+    }
+    if let Some(v) = obj.get("disk_paths") {
+        if let Some(arr) = v.as_array() {
+            disk_paths = Some(
+                arr.iter()
+                    .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                    .collect(),
+            );
+        } else {
+            out.insert("disk_paths".into(), v.clone());
+        }
+    }
+
+    let mut mapped_modules = 0usize;
+    if let Some(modules) = obj.get("modules") {
+        let Some(arr) = modules.as_array() else {
+            return Err("`modules` must be an array".into());
+        };
+        let mut mapped = Vec::new();
+        for entry in arr {
+            if let Some(m) = map_module_entry(entry, &mut warnings, &mut disk_paths) {
+                mapped.push(m);
+                mapped_modules += 1;
+            }
+        }
+        out.insert("modules".into(), serde_json::Value::Array(mapped));
+    }
+
+    if let Some(paths) = &disk_paths {
+        out.insert("disk_paths".into(), serde_json::json!(paths));
+    }
+
+    Ok(FastfetchImport {
+        config: serde_json::Value::Object(out),
+        mapped_modules,
+        warnings,
+        disk_paths,
+    })
+}
+
+/// Load a fastfetch config file from disk and map it.
+pub fn import_fastfetch_from_path(path: &Path) -> Result<FastfetchImport, String> {
+    let raw =
+        fs::read_to_string(path).map_err(|e| format!("failed to read {}: {e}", path.display()))?;
+    map_fastfetch_config(&raw)
+}
+
+/// Write an imported config to `dest`. Refuses to overwrite unless `force`.
+pub fn write_imported_config(
+    dest: &Path,
+    value: &serde_json::Value,
+    force: bool,
+) -> Result<PathBuf, String> {
+    if dest.exists() && !force {
+        return Err(format!(
+            "refusing to overwrite existing config at {} (use --force)",
+            dest.display()
+        ));
+    }
+    write_config_value(dest, value)
+}
+
+#[cfg(test)]
+mod import_tests {
+    use super::*;
+
+    #[test]
+    fn maps_fastfetch_fixture_modules() {
+        let raw = include_str!("../tests/fixtures/fastfetch_sample.jsonc");
+        let imported = map_fastfetch_config(raw).expect("fixture should parse");
+
+        assert_eq!(imported.mapped_modules, 11);
+        assert!(
+            imported
+                .warnings
+                .iter()
+                .any(|w| w.contains("unmapped key 'general'"))
+        );
+        assert!(
+            imported
+                .warnings
+                .iter()
+                .any(|w| w.contains("unmapped key 'stat'"))
+        );
+        assert!(
+            imported
+                .warnings
+                .iter()
+                .any(|w| w.contains("unmapped module 'weather'"))
+        );
+        assert!(
+            imported
+                .warnings
+                .iter()
+                .any(|w| w.contains("unmapped logo key 'preserveAspectRatio'"))
+        );
+        assert!(
+            imported
+                .warnings
+                .iter()
+                .any(|w| w.contains("unmapped display key 'brightColor'"))
+        );
+
+        let modules = imported.config["modules"].as_array().unwrap();
+        let kinds: Vec<&str> = modules
+            .iter()
+            .map(|m| match m {
+                serde_json::Value::String(s) => s.as_str(),
+                serde_json::Value::Object(o) => o["type"].as_str().unwrap(),
+                _ => panic!("unexpected module entry"),
+            })
+            .collect();
+
+        assert_eq!(
+            kinds,
+            vec![
+                "title",
+                "separator",
+                "os",
+                "kernel",
+                "terminal_font",
+                "local_ip",
+                "power_adapter",
+                "wm_theme",
+                "disk",
+                "break",
+                "colors",
+            ]
+        );
+
+        assert_eq!(
+            imported.disk_paths.as_deref(),
+            Some(vec!["/".to_string()].as_slice())
+        );
+        assert_eq!(
+            imported.config["display"]["separator"].as_str(),
+            Some(" -> ")
+        );
+        assert_eq!(imported.config["logo"]["source"].as_str(), Some("arch"));
+
+        let cfg: Config =
+            serde_json::from_value(imported.config.clone()).expect("mapped config deserializes");
+        let normalized = cfg.get_normalized_modules().unwrap();
+        assert!(normalized.contains(&"terminal_font".to_string()));
+        assert!(normalized.contains(&"local_ip".to_string()));
+        assert!(!normalized.iter().any(|m| m == "weather"));
+    }
+
+    #[test]
+    fn strips_jsonc_before_import() {
+        let raw = "{\n  // comment\n  \"modules\": [\"os\" /* hi */, \"cpu\"]\n}\n";
+        let imported = map_fastfetch_config(raw).unwrap();
+        assert_eq!(imported.mapped_modules, 2);
+    }
+
+    #[test]
+    fn maps_fastfetch_command_module() {
+        let raw = r#"{
+            "modules": [
+                { "type": "command", "key": "Editor", "text": "echo vim" },
+                { "type": "custom", "key": "Git", "text": "zack" }
+            ]
+        }"#;
+        let imported = map_fastfetch_config(raw).unwrap();
+        assert_eq!(imported.mapped_modules, 2);
+        let modules = imported.config["modules"].as_array().unwrap();
+        assert_eq!(modules[0]["type"], "command");
+        assert_eq!(modules[0]["command"], "echo vim");
+        assert_eq!(modules[0]["key"], "Editor");
+        assert_eq!(modules[1]["type"], "custom");
+        assert_eq!(modules[1]["text"], "zack");
+    }
 }

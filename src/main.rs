@@ -1,6 +1,7 @@
 mod art;
 mod banner;
 mod cli;
+mod completions;
 mod config;
 mod info;
 mod kitty;
@@ -11,7 +12,10 @@ mod tui;
 mod utils;
 
 use cli::{parse_cli, print_help, print_modules};
-use config::{generate_default_config, load_config};
+use config::{
+    default_config_path_for_write, generate_default_config, import_fastfetch_from_path,
+    load_config, write_imported_config,
+};
 use info::gather_info;
 use logos::ALL_LOGOS;
 use std::env;
@@ -36,8 +40,88 @@ fn main() {
         return;
     }
 
+    if let Some(shell) = cli_opts.completions.as_deref() {
+        match completions::generate(shell) {
+            Ok(script) => {
+                print!("{script}");
+            }
+            Err(err) => {
+                eprintln!("error: {err}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
     if cli_opts.gen_config {
         println!("{}", generate_default_config());
+        return;
+    }
+
+    if cli_opts.import_fastfetch {
+        let source = match cli_opts.import_fastfetch_path {
+            Some(ref p) => p.clone(),
+            None => match config::find_fastfetch_config_path() {
+                Some(p) => p,
+                None => {
+                    eprintln!(
+                        "error: no fastfetch config found; pass a path or place one at ~/.config/fastfetch/config.jsonc"
+                    );
+                    std::process::exit(1);
+                }
+            },
+        };
+
+        let imported = match import_fastfetch_from_path(&source) {
+            Ok(v) => v,
+            Err(err) => {
+                eprintln!("error: {err}");
+                std::process::exit(1);
+            }
+        };
+
+        for warning in &imported.warnings {
+            eprintln!("warning: {warning}");
+        }
+
+        let pretty = match serde_json::to_string_pretty(&imported.config) {
+            Ok(s) => s,
+            Err(err) => {
+                eprintln!("error: failed to serialize mapped config: {err}");
+                std::process::exit(1);
+            }
+        };
+
+        if cli_opts.dry_run {
+            println!("{pretty}");
+            eprintln!(
+                "dry-run: would import {} mapped module(s) from {} (no file written)",
+                imported.mapped_modules,
+                source.display()
+            );
+            return;
+        }
+
+        let dest = cli_opts
+            .config_path
+            .clone()
+            .unwrap_or_else(default_config_path_for_write);
+
+        match write_imported_config(&dest, &imported.config, cli_opts.force) {
+            Ok(written) => {
+                println!("Imported fastfetch config");
+                println!("  source:      {}", source.display());
+                println!("  destination: {}", written.display());
+                println!("  mapped modules: {}", imported.mapped_modules);
+                if let Some(paths) = &imported.disk_paths {
+                    println!("  disk_paths:     {}", paths.join(", "));
+                }
+            }
+            Err(err) => {
+                eprintln!("error: {err}");
+                std::process::exit(1);
+            }
+        }
         return;
     }
 
@@ -80,7 +164,6 @@ fn main() {
     }
 
     let cfg_logo_name = file_cfg.get_logo_name();
-    let cfg_modules = file_cfg.get_normalized_modules();
 
     let effective_no_color = cli_opts.no_color || file_cfg.no_color.unwrap_or(false);
     let effective_no_logo = cli_opts.no_logo || file_cfg.no_logo.unwrap_or(false);
@@ -88,7 +171,6 @@ fn main() {
         .logo
         .as_deref()
         .or_else(|| cfg_logo_name.as_deref().filter(|s| *s != "auto"));
-    let effective_structure = cli_opts.structure.as_ref().or(cfg_modules.as_ref());
 
     let effective_disks = cli_opts
         .disk_paths
@@ -221,7 +303,7 @@ fn main() {
             style.padding_right = cfg_pad.right;
         }
     }
-    if let Some(structure) = effective_structure {
+    if let Some(structure) = cli_opts.structure.as_ref() {
         style.modules = Some(
             structure
                 .iter()
@@ -231,6 +313,8 @@ fn main() {
                 })
                 .collect(),
         );
+    } else if let Some(specs) = file_cfg.get_modules() {
+        style.modules = Some(specs);
     }
     if style.separator.is_none()
         && let Some(d) = file_cfg.display.as_ref()
@@ -238,6 +322,14 @@ fn main() {
     {
         style.separator = Some(s.clone());
     }
+
+    // Human output hides empty info modules by default; JSON always includes all fields.
+    let cfg_show_empty = file_cfg
+        .display
+        .as_ref()
+        .and_then(|d| d.show_empty)
+        .unwrap_or(false);
+    style.show_empty = cli_opts.show_empty || cfg_show_empty;
 
     if cli_opts.json {
         if let Ok(serialized) = serde_json::to_string_pretty(&system_info) {
@@ -300,9 +392,82 @@ mod tests {
     }
 
     #[test]
+    fn parses_sixel_and_iterm_image_flags() {
+        let sixel = parse_cli(&[
+            "--sixel".to_string(),
+            "/tmp/logo.png".to_string(),
+            "--logo-width".to_string(),
+            "24".to_string(),
+        ])
+        .unwrap();
+        assert_eq!(sixel.logo.as_deref(), Some("/tmp/logo.png"));
+        assert_eq!(sixel.logo_type.as_deref(), Some("sixel"));
+        assert_eq!(sixel.logo_width, Some(24));
+
+        let iterm = parse_cli(&["--iterm".to_string(), "/tmp/avatar.png".to_string()]).unwrap();
+        assert_eq!(iterm.logo.as_deref(), Some("/tmp/avatar.png"));
+        assert_eq!(iterm.logo_type.as_deref(), Some("iterm"));
+
+        let typed = parse_cli(&[
+            "--logo-type".to_string(),
+            "iterm".to_string(),
+            "--logo".to_string(),
+            "pic.png".to_string(),
+        ])
+        .unwrap();
+        assert_eq!(typed.logo_type.as_deref(), Some("iterm"));
+        assert_eq!(typed.logo.as_deref(), Some("pic.png"));
+    }
+
+    #[test]
     fn rejects_unknown_cli_arguments() {
         let args = vec!["--unknown-flag".to_string()];
         assert!(parse_cli(&args).is_err());
+    }
+
+    #[test]
+    fn parses_show_empty_flag() {
+        let opts = parse_cli(&["--show-empty".to_string()]).unwrap();
+        assert!(opts.show_empty);
+        let default = parse_cli(&[]).unwrap();
+        assert!(!default.show_empty);
+    }
+
+    #[test]
+    fn parses_completions_flag() {
+        let opts = parse_cli(&["--completions".to_string(), "bash".to_string()]).unwrap();
+        assert_eq!(opts.completions.as_deref(), Some("bash"));
+        assert!(parse_cli(&["--completions".to_string()]).is_err());
+    }
+
+    #[test]
+    fn parses_import_fastfetch_flags() {
+        let bare = parse_cli(&["--import-fastfetch".to_string()]).unwrap();
+        assert!(bare.import_fastfetch);
+        assert!(bare.import_fastfetch_path.is_none());
+        assert!(!bare.force);
+        assert!(!bare.dry_run);
+
+        let with_path = parse_cli(&[
+            "--import-fastfetch".to_string(),
+            "/tmp/ff.jsonc".to_string(),
+            "--force".to_string(),
+            "--dry-run".to_string(),
+            "--config".to_string(),
+            "/tmp/out.jsonc".to_string(),
+        ])
+        .unwrap();
+        assert!(with_path.import_fastfetch);
+        assert_eq!(
+            with_path.import_fastfetch_path.as_deref(),
+            Some(std::path::Path::new("/tmp/ff.jsonc"))
+        );
+        assert!(with_path.force);
+        assert!(with_path.dry_run);
+        assert_eq!(
+            with_path.config_path.as_deref(),
+            Some(std::path::Path::new("/tmp/out.jsonc"))
+        );
     }
 
     #[test]

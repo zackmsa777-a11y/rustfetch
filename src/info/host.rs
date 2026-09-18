@@ -1,6 +1,19 @@
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use crate::utils::{clean, read_first_line, run_cmd};
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::path::Path;
 
+#[cfg(target_os = "macos")]
+pub fn detect_host() -> Option<String> {
+    crate::info::platform::macos::host::detect_host()
+}
+
+#[cfg(target_os = "windows")]
+pub fn detect_host() -> Option<String> {
+    crate::info::platform::windows::host::detect_host()
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn detect_host() -> Option<String> {
     if Path::new("/.dockerenv").exists() {
         return Some("Docker Container".to_string());
@@ -86,3 +99,4 @@ pub fn detect_host() -> Option<String> {
 
     Some(host_str)
 }
+

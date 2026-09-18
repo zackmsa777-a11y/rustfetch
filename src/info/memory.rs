@@ -1,6 +1,8 @@
 use crate::utils::value;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::fs;
 
+#[cfg_attr(any(target_os = "macos", target_os = "windows"), allow(dead_code))]
 pub fn format_memory(input: &str) -> Option<String> {
     let total_str = value(input, "MemTotal", ':')?;
     let avail_str = value(input, "MemAvailable", ':').or_else(|| value(input, "MemFree", ':'))?;
@@ -22,6 +24,17 @@ pub fn format_memory(input: &str) -> Option<String> {
     Some(format!("{used_gib:.2} GiB / {total_gib:.2} GiB ({pct}%)"))
 }
 
+#[cfg(target_os = "macos")]
+pub fn detect_memory() -> Option<String> {
+    crate::info::platform::macos::memory::detect_memory()
+}
+
+#[cfg(target_os = "windows")]
+pub fn detect_memory() -> Option<String> {
+    crate::info::platform::windows::memory::detect_memory()
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn detect_memory() -> Option<String> {
     let meminfo = fs::read_to_string("/proc/meminfo").unwrap_or_default();
     format_memory(&meminfo)

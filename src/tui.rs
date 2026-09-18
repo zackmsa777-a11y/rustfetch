@@ -4,6 +4,7 @@ use crate::info::types::SystemInfo;
 use crate::printer::{render_lines, style_from_theme};
 use crate::utils::visible_width;
 use std::io::{self, Write};
+#[cfg(unix)]
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 
@@ -117,8 +118,14 @@ pub fn terminal_dimensions() -> (usize, usize) {
     (80, 24)
 }
 
+#[cfg(unix)]
 fn stdin_is_tty() -> bool {
     unsafe { libc::isatty(io::stdin().as_raw_fd()) != 0 }
+}
+
+#[cfg(not(unix))]
+fn stdin_is_tty() -> bool {
+    true
 }
 
 #[cfg(unix)]
@@ -1271,6 +1278,7 @@ pub fn run_setup(
 
     #[cfg(not(unix))]
     {
+        let _ = (no_logo, logo_override);
         return numbered_fallback(info, cfg, &themes, config_path);
     }
 

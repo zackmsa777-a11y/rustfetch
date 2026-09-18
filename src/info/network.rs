@@ -1,7 +1,11 @@
+#[cfg(target_os = "linux")]
 use std::ffi::CStr;
+#[cfg(target_os = "linux")]
 use std::fs;
+#[cfg(target_os = "linux")]
 use std::net::Ipv4Addr;
 
+#[cfg(target_os = "linux")]
 pub fn detect_local_ip() -> Option<String> {
     let route = fs::read_to_string("/proc/net/route").ok()?;
     let mut default_iface = None;
@@ -49,4 +53,10 @@ pub fn detect_local_ip() -> Option<String> {
 
         result.map(|ip| format!("{iface_name}: {ip}"))
     }
+}
+
+
+#[cfg(not(target_os = "linux"))]
+pub fn detect_local_ip() -> Option<String> {
+    None
 }

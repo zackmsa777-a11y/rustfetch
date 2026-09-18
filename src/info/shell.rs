@@ -1,8 +1,23 @@
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use crate::utils::clean;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::env;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::path::Path;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::process::Command;
 
+#[cfg(target_os = "macos")]
+pub fn detect_shell() -> Option<String> {
+    crate::info::platform::macos::shell::detect_shell()
+}
+
+#[cfg(target_os = "windows")]
+pub fn detect_shell() -> Option<String> {
+    crate::info::platform::windows::shell::detect_shell()
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn detect_shell() -> Option<String> {
     let shell_path = env::var("SHELL").ok()?;
     let shell_name = Path::new(&shell_path)

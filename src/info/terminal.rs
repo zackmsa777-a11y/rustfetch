@@ -1,9 +1,25 @@
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use crate::utils::{clean, run_cmd};
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::env;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::ffi::CStr;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::fs;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::path::Path;
 
+#[cfg(target_os = "macos")]
+pub fn detect_terminal() -> (Option<String>, Option<String>) {
+    crate::info::platform::macos::terminal::detect_terminal()
+}
+
+#[cfg(target_os = "windows")]
+pub fn detect_terminal() -> (Option<String>, Option<String>) {
+    crate::info::platform::windows::terminal::detect_terminal()
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn detect_terminal() -> (Option<String>, Option<String>) {
     let mut term_name = None;
     let mut term_font = None;

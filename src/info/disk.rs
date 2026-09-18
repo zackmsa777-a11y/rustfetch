@@ -1,6 +1,19 @@
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::ffi::CString;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::fs;
 
+#[cfg(target_os = "macos")]
+pub fn detect_disks(custom_paths: Option<&[String]>) -> Option<Vec<String>> {
+    crate::info::platform::macos::disk::detect_disks(custom_paths)
+}
+
+#[cfg(target_os = "windows")]
+pub fn detect_disks(custom_paths: Option<&[String]>) -> Option<Vec<String>> {
+    crate::info::platform::windows::disk::detect_disks(custom_paths)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn format_disk_mount(mount_path: &str) -> Option<String> {
     let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
     let c_path = CString::new(mount_path).ok()?;
@@ -38,6 +51,7 @@ pub fn format_disk_mount(mount_path: &str) -> Option<String> {
     ))
 }
 
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn detect_disks(custom_paths: Option<&[String]>) -> Option<Vec<String>> {
     let paths_to_check: Vec<String> = if let Some(paths) = custom_paths {
         paths.to_vec()

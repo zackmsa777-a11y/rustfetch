@@ -48,8 +48,10 @@
 - **Authentic Fastfetch ASCII Logos**: 45+ pixel-perfect logos matching Fastfetch, compiled directly into Rust with accurate brand colors and automatic runtime fallback. Clean terminal aesthetics with zero emojis.
 - **Concurrent Multi-threaded Probes**: Hardware and environment modules run in parallel with scoped threads (`std::thread::scope`).
 - **Real System Detection**: Real hardware metrics—not hardcoded strings or mock prints. Accurately queries CPU, GPU, memory, swap, mount points, battery, displays, desktop environments, window managers, themes, fonts, and network interfaces.
+- **Cross-Platform Info Backends**: Linux remains the full default; macOS and Windows compile dedicated core probes (see [Platform Support](#platform-support)).
 - **Structured JSON & Config Export**: Full `--json` export for scripts and monitoring, plus instant `[e]` export from the TUI to save any theme as custom JSONC to `~/.config/rustfetch/config.jsonc`.
-- **Kitty Graphics Protocol & Image Logos**: High-resolution image rendering using the native Kitty Graphics Protocol (`t=f` file mode and `t=d` chunked direct transfer) supported in Kitty, Ghostty, and WezTerm. Includes header dimension probing (PNG, JPEG, GIF, WebP), automatic aspect ratio preservation, and customizable cell width/height and padding.
+- **Clean Empty-Module Filtering**: Blank info lines are hidden by default (ideal for containers/VMs); opt back in with `--show-empty` or `display.showEmpty`.
+- **Image Logos (Kitty, Sixel, iTerm2)**: High-resolution image rendering via Kitty Graphics Protocol (`t=f` / `t=d`), Sixel (PNG/JPEG encode), and iTerm2 inline images (`OSC 1337`). Auto mode probes `$TERM`, `$TERM_PROGRAM`, `KITTY_WINDOW_ID`, `ITERM_SESSION_ID`, and related env vars (WezTerm, foot, Windows Terminal, iTerm2, etc.). Includes dimension probing, aspect-aware cell sizing, and padding options. Unsupported terminals fall back to ASCII logos.
 - **Pure Self-Documenting Architecture**: Built with zero source-code comments for maximum cleanliness and maintainability.
 
 ---
@@ -80,23 +82,129 @@ Measured on a standard Linux workstation (average of 50 runs):
 curl -sSL https://raw.githubusercontent.com/zackmsa777-a11y/rustfetch/master/install.sh | bash
 ```
 
-The installer picks the latest GitHub Release asset for your OS/arch (musl, gnu, or darwin), validates the download archive, and falls back to `cargo install --git` if no matching asset exists.
+The installer detects OS/arch, prefers the latest GitHub Release asset for
+`zackmsa777-a11y/rustfetch` (musl → gnu on Linux, darwin on macOS), validates
+the gzip archive, and falls back to `cargo install --path` (from a checkout) or
+`cargo install --git` if no matching asset exists.
+
+Environment knobs:
+
+| Variable | Effect |
+| :--- | :--- |
+| `INSTALL_DIR` | Install prefix for the binary (default: writable `/usr/local/bin`, else `~/.local/bin`) |
+| `FORCE=1` | Reinstall even when the installed version already matches the latest tag |
+| `METHOD=cargo` | Skip release downloads; use cargo (`--path` or `--git`) |
 
 You can also grab release archives directly from [GitHub Releases](https://github.com/zackmsa777-a11y/rustfetch/releases/latest).
+
+### Cargo (crates.io)
+
+The crates.io package is named **`rustftechh`** (the GitHub repo stays `rustfetch`).
+Installing the crate places the **`rustfetch`** binary on your `PATH`:
+
+```bash
+cargo install rustftechh --locked
+# -> ~/.cargo/bin/rustfetch
+```
+
+> **Note:** The name `rustfetch` was already taken on crates.io by another project
+> (max version **0.5.0**, owner [`dtomvan`](https://github.com/dtomvan)). This
+> project therefore publishes as **`rustftechh`**; docs live at
+> [docs.rs/rustftechh](https://docs.rs/rustftechh). Until the crate is published,
+> use the git/`install.sh` methods below.
 
 ### Cargo via Git
 
 ```bash
-cargo install --git https://github.com/zackmsa777-a11y/rustfetch.git
+cargo install --git https://github.com/zackmsa777-a11y/rustfetch.git --locked
 ```
 
-### Build from Source
+### Build from Source / Makefile
 
 ```bash
 git clone https://github.com/zackmsa777-a11y/rustfetch.git
 cd rustfetch
 cargo build --release
+# or:
+make install                 # -> ~/.local/bin/rustfetch
+make completions-install     # bash/zsh/fish under ~/.local/share/...
+make man-install             # -> ~/.local/share/man/man1/rustfetch.1
+```
+
+Equivalent manual copy:
+
+```bash
 cp target/release/rustfetch ~/.cargo/bin/
+# or: cargo install --path . --locked
+```
+
+### Homebrew (formula stub — not tapped yet)
+
+A formula template lives at [`packaging/homebrew/rustftechh.rb`](packaging/homebrew/rustftechh.rb)
+(`class Rustftechh`; installs the `rustfetch` binary). After the first tagged release,
+fill `url`/`sha256` and submit to a tap or homebrew-core:
+
+```bash
+# When published to a tap:
+brew install rustftechh
+# or from this repo's stub (after filling checksums):
+# brew install --formula ./packaging/homebrew/rustftechh.rb
+```
+
+### AUR (PKGBUILD stub — not uploaded yet)
+
+Arch packaging stubs: [`packaging/aur/PKGBUILD`](packaging/aur/PKGBUILD) and
+[`packaging/aur/.SRCINFO`](packaging/aur/.SRCINFO) (`pkgname=rustftechh`, binary
+`/usr/bin/rustfetch`). See [`packaging/aur/README.md`](packaging/aur/README.md)
+for checksum / `.SRCINFO` steps.
+
+```bash
+# When uploaded to the AUR:
+yay -S rustftechh
+# or: paru -S rustftechh
+```
+
+### Scoop (Windows stub)
+
+Manifest stub: [`packaging/scoop/rustftechh.json`](packaging/scoop/rustftechh.json)
+(`bin`: `rustfetch.exe`; fill hash after a Windows release asset exists).
+
+### Shell Completions
+
+Generate a completion script for your shell and install it in the usual location:
+
+```bash
+# Bash (requires bash-completion)
+rustfetch --completions bash | sudo tee /usr/share/bash-completion/completions/rustfetch >/dev/null
+# or user-local:
+mkdir -p ~/.local/share/bash-completion/completions
+rustfetch --completions bash > ~/.local/share/bash-completion/completions/rustfetch
+
+# Zsh (add to fpath or copy into a directory already on fpath)
+rustfetch --completions zsh > ~/.zsh/completions/_rustfetch
+# or: source <(rustfetch --completions zsh)
+
+# Fish
+rustfetch --completions fish > ~/.config/fish/completions/rustfetch.fish
+
+# From a source checkout via Makefile:
+make completions-install
+```
+
+Checked-in copies also live under `completions/` (`rustfetch.bash`, `rustfetch.zsh`, `rustfetch.fish`) for packaging.
+
+### Man Page
+
+```bash
+# From a source checkout
+sudo mkdir -p /usr/local/share/man/man1
+sudo cp man/rustfetch.1 /usr/local/share/man/man1/
+# or user-local:
+mkdir -p ~/.local/share/man/man1
+cp man/rustfetch.1 ~/.local/share/man/man1/
+mandb ~/.local/share/man 2>/dev/null || true
+# or: make man-install
+man rustfetch
 ```
 
 ---
@@ -156,10 +264,12 @@ OPTIONS:
     --preview-themes       Print a live preview of every theme
     --logo <NAME>          Specify a custom distro or OS logo
     --logo-color <COLOR>   Override the logo primary ANSI color
-    --logo-type <TYPE>     Logo type: kitty, kitty-direct, kitty-icat, file, builtin, auto
+    --logo-type <TYPE>     Logo type: kitty, kitty-direct, kitty-icat, sixel, iterm, file, builtin, auto
     --kitty <PATH>         Display an image logo using the Kitty graphics protocol
     --kitty-direct <PATH>  Display an image using direct Kitty file transfer
     --kitty-icat <PATH>    Display an image via kitten icat tool
+    --sixel <PATH>         Display an image logo using the Sixel protocol
+    --iterm <PATH>         Display an image logo using iTerm2 inline images
     --logo-width <NUM>     Target width in terminal character cells for image logo
     --logo-height <NUM>    Target height in terminal character cells for image logo
     --logo-padding <NUM>   Horizontal gap between image logo and module lines
@@ -172,12 +282,19 @@ OPTIONS:
     --disk-paths <PATHS>   Comma-separated list of mount paths to check (default: /)
     --config <PATH>        Path to custom JSON/JSONC configuration file
     --gen-config           Print default JSON configuration to stdout
+    --import-fastfetch [PATH]  Import a fastfetch JSON/JSONC config into rustfetch
+    --force                Overwrite an existing rustfetch config when importing
+    --dry-run              Print the mapped import to stdout without writing
     --list-logos           List all supported distro and OS logos
     --list-modules         List all available information modules
     --json                 Output system information in structured JSON format
+    --show-empty           Show info modules even when their value is empty
+    --completions <SHELL>  Print shell completion script (bash, zsh, fish)
     -v, --version          Print version information
     -h, --help             Print help information
 ```
+
+Empty info modules (common in containers/VMs) are **hidden by default** in human output. Use `--show-empty` or set `"display": { "showEmpty": true }` in config to restore blank keys. `--json` always includes null/empty fields for scripting.
 
 ### Common Examples
 
@@ -194,6 +311,16 @@ rustfetch --kitty ~/Pictures/wallpaper.png --logo-width 36 --logo-padding 4
 
 # Direct transmission mode (works over SSH or inside containers without shared filesystem)
 rustfetch --kitty-direct ~/Pictures/logo.png
+
+# Sixel (WezTerm, foot, Windows Terminal where supported, mlterm, etc.)
+rustfetch --sixel ~/Pictures/avatar.png
+rustfetch --logo-type sixel --logo ~/Pictures/avatar.png --logo-width 30
+
+# iTerm2 inline images (iTerm2, and other OSC 1337 terminals)
+rustfetch --iterm ~/Pictures/avatar.png
+
+# Auto-detect image protocol from the terminal environment
+rustfetch --logo-type auto --logo ~/Pictures/avatar.png
 
 # Try a theme once without modifying configuration
 rustfetch --theme groups
@@ -216,11 +343,21 @@ rustfetch --logo rust
 # Select custom modules and ordering
 rustfetch --structure title:os:kernel:cpu:gpu:memory:disk:colors
 
+# Import a fastfetch config into ~/.config/rustfetch/config.jsonc
+rustfetch --import-fastfetch
+rustfetch --import-fastfetch ~/.config/fastfetch/config.jsonc --dry-run
+
 # Output raw JSON for scripting or monitoring
 rustfetch --json | jq .cpu
 
 # Minimal fetch with no logo
 rustfetch --no-logo
+
+# Show empty modules (containers / VMs)
+rustfetch --show-empty
+
+# Print bash completion script
+rustfetch --completions bash
 ```
 
 ---
@@ -392,6 +529,8 @@ Run `rustfetch --list-modules` to see the complete module catalog:
 | `audio` | Sound devices & audio server | `/proc/asound/cards`, ALSA/PipeWire |
 | `local_ip` | Primary interface IP and CIDR subnet | `/proc/net/route`, `getifaddrs` |
 | `locale` | System locale and encoding | `$LC_ALL`, `$LANG` |
+| `command` | Run a command; show trimmed stdout | `std::process::Command` (optional `shell: true`), default 1.5s timeout |
+| `custom` | Static keyed text (`key`+`text`) or decorative `format` line | Config only |
 | `break` | Blank spacing line | Terminal newline |
 | `colors` | 16 ANSI color palette blocks | 8 standard + 8 bright background blocks |
 
@@ -410,6 +549,50 @@ Generate a template configuration with:
 ```bash
 rustfetch --gen-config > ~/.config/rustfetch/config.jsonc
 ```
+
+### Import from fastfetch
+
+Migrate an existing fastfetch JSON/JSONC config into rustfetch's config path:
+
+```bash
+# Auto-discover ~/.config/fastfetch/config.jsonc (or config.json / $XDG_CONFIG_HOME/...)
+rustfetch --import-fastfetch
+
+# Explicit source path
+rustfetch --import-fastfetch ~/.config/fastfetch/config.jsonc
+
+# Preview the mapped config without writing
+rustfetch --import-fastfetch --dry-run
+
+# Choose destination and overwrite if needed
+rustfetch --import-fastfetch ./my-fastfetch.jsonc --config ~/.config/rustfetch/config.jsonc --force
+```
+
+Supported keys (`logo`, `display` separator/colors, `modules`, `disk_paths`, …) are mapped; unknown top-level keys and unsupported modules are skipped with a stderr warning. Disk `folders` inside a fastfetch `disk` module become `disk_paths`.
+
+
+### Custom / script modules
+
+Inject arbitrary lines (weather, now-playing, git user, etc.) into the fetch:
+
+```jsonc
+{
+  "modules": [
+    "title",
+    "separator",
+    { "type": "os", "key": "OS" },
+    { "type": "command", "key": "Weather", "command": "curl -s wttr.in/?format=3" },
+    { "type": "command", "key": "Editor", "text": "echo $EDITOR", "shell": true, "timeout": 2000 },
+    { "type": "custom", "key": "Git", "text": "zackmsa777-a11y" },
+    "break",
+    "colors"
+  ]
+}
+```
+
+- `command`: runs via `std::process::Command` (split on whitespace) unless `"shell": true` (`/bin/sh -c`). Fastfetch-compatible `"text"` is accepted as the command string. Default timeout is **1500ms**; hung commands are killed. Non-zero exit / timeout / empty stdout → hidden (same as other empty modules) unless `"showFailure": true` or `--show-empty` / `display.showEmpty`.
+- `custom`: with `"key"` + `"text"` prints a normal keyed line; with only `"format"` (legacy) prints a decorative structural line (used by layout themes).
+- Aliases: `exec` → `command`, `static` → `custom`. `--import-fastfetch` maps fastfetch `command` modules (copies `text` → `command`).
 
 ### Example `config.jsonc`
 
@@ -464,6 +647,8 @@ rustfetch --gen-config > ~/.config/rustfetch/config.jsonc
 
 ### Kitty Graphics & Image Themes
 
+Image logos support **Kitty**, **Sixel**, and **iTerm2** protocols. Sixel encoding accepts PNG/JPEG (decoded via the `image` crate), quantizes to a 6-level RGB palette (up to 216 colors), and targets roughly 10×20 pixels per terminal cell (capped for size). iTerm2 sends the original file bytes as base64 with cell width/height hints. If the chosen protocol is unsupported or encoding fails, rustfetch falls back to the ASCII distro logo.
+
 `rustfetch` includes out-of-the-box Kitty image presets that work immediately:
 
 ```bash
@@ -497,6 +682,34 @@ To configure a high-resolution image logo permanently in `~/.config/rustfetch/co
   }
 }
 ```
+
+
+---
+
+## Platform Support
+
+Info backends are selected at compile time via `#[cfg(target_os = ...)]` under `src/info/platform/`. Logos for macOS, Windows, and others already ship on every OS.
+
+| Platform | Probe coverage | Notes |
+| :--- | :--- | :--- |
+| **Linux** | **Full** | Default path: `procfs` / `sysfs` / `libc` for all modules (OS, host, kernel, uptime, packages, shell, DE/WM, terminal, CPU, GPU, memory, swap, disk, battery, audio, network, locale, …). |
+| **macOS (Darwin)** | **Core** | OS, host (`hw.model`), kernel, uptime, CPU, memory, swap, packages (Homebrew / MacPorts), shell, terminal (`TERM_PROGRAM`), disk (`statfs` + `/Volumes`), battery (`pmset` with timeout). DE/WM, GPU, display, audio, and local IP are best-effort / empty for now. |
+| **Windows** | **Core** | OS, host (BIOS registry), kernel/build (`RtlGetVersion`), uptime, CPU, memory, swap (page file), disk (`GetDiskFreeSpaceExW`), shell (PowerShell / `ComSpec`), terminal (Windows Terminal / env). Packages, battery, GPU, DE/WM, audio, and network left for later. |
+| **Other** | **Logos / best-effort** | FreeBSD, OpenBSD, NetBSD, Haiku, Android, etc. get ASCII logos; probes fall through the non-macOS/non-Windows path where possible and otherwise hide empty modules. |
+
+### Cross-checking Darwin / Windows from Linux
+
+Rust does not compile foreign `#[cfg]` modules on the host target. To typecheck those backends:
+
+```bash
+./scripts/check-cross.sh
+# or manually:
+rustup target add aarch64-apple-darwin x86_64-apple-darwin x86_64-pc-windows-gnu x86_64-pc-windows-msvc
+cargo check --target aarch64-apple-darwin
+cargo check --target x86_64-pc-windows-gnu
+```
+
+Linking a full binary may fail without an Apple/Windows linker toolchain; a successful `cargo check` (or compile errors from the platform modules themselves) is enough to validate the source. Runtime verification still requires the real OS.
 
 ---
 

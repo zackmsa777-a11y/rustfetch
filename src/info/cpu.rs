@@ -1,6 +1,8 @@
 use crate::utils::{clean, read_first_line, value};
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::fs;
 
+#[cfg_attr(any(target_os = "macos", target_os = "windows"), allow(dead_code))]
 pub fn format_cpu(cpuinfo: &str) -> Option<String> {
     let model = value(cpuinfo, "model name", ':')
         .or_else(|| value(cpuinfo, "Hardware", ':'))
@@ -40,6 +42,17 @@ pub fn format_cpu(cpuinfo: &str) -> Option<String> {
     Some(result)
 }
 
+#[cfg(target_os = "macos")]
+pub fn detect_cpu() -> Option<String> {
+    crate::info::platform::macos::cpu::detect_cpu()
+}
+
+#[cfg(target_os = "windows")]
+pub fn detect_cpu() -> Option<String> {
+    crate::info::platform::windows::cpu::detect_cpu()
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn detect_cpu() -> Option<String> {
     let cpuinfo = fs::read_to_string("/proc/cpuinfo").unwrap_or_default();
     format_cpu(&cpuinfo)

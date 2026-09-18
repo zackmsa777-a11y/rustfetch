@@ -1,6 +1,19 @@
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use crate::utils::{clean, read_first_line};
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::fs;
 
+#[cfg(target_os = "macos")]
+pub fn detect_battery_and_power() -> (Option<String>, Option<String>) {
+    crate::info::platform::macos::battery::detect_battery_and_power()
+}
+
+#[cfg(target_os = "windows")]
+pub fn detect_battery_and_power() -> (Option<String>, Option<String>) {
+    (None, None)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn detect_battery_and_power() -> (Option<String>, Option<String>) {
     let mut battery_str = None;
     let mut power_adapter_str = None;
