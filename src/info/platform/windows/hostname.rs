@@ -10,6 +10,10 @@ pub fn detect_hostname() -> Option<String> {
         }
         let name = ffi::from_wide_nul(&buf);
         let cleaned = clean(name.trim());
-        if cleaned.is_empty() { None } else { Some(cleaned) }
+        if cleaned.is_empty() {
+            None
+        } else {
+            Some(cleaned)
+        }
     }
 }

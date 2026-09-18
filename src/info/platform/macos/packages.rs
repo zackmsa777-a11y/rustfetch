@@ -33,5 +33,9 @@ pub fn detect_packages() -> Option<String> {
         }
     }
 
-    if counts.is_empty() { None } else { Some(counts.join(", ")) }
+    if counts.is_empty() {
+        None
+    } else {
+        Some(counts.join(", "))
+    }
 }

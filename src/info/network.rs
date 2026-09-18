@@ -55,7 +55,6 @@ pub fn detect_local_ip() -> Option<String> {
     }
 }
 
-
 #[cfg(not(target_os = "linux"))]
 pub fn detect_local_ip() -> Option<String> {
     None

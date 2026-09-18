@@ -2,20 +2,9 @@ use super::ffi;
 use crate::utils::clean;
 
 pub fn detect_host() -> Option<String> {
-    let manufacturer = ffi::reg_sz(
-        r"HARDWARE\DESCRIPTION\System\BIOS",
-        "SystemManufacturer",
-    );
-    let product = ffi::reg_sz(
-        r"HARDWARE\DESCRIPTION\System\BIOS",
-        "SystemProductName",
-    )
-    .or_else(|| {
-        ffi::reg_sz(
-            r"HARDWARE\DESCRIPTION\System\BIOS",
-            "BaseBoardProduct",
-        )
-    });
+    let manufacturer = ffi::reg_sz(r"HARDWARE\DESCRIPTION\System\BIOS", "SystemManufacturer");
+    let product = ffi::reg_sz(r"HARDWARE\DESCRIPTION\System\BIOS", "SystemProductName")
+        .or_else(|| ffi::reg_sz(r"HARDWARE\DESCRIPTION\System\BIOS", "BaseBoardProduct"));
 
     let filter = |s: Option<String>| -> Option<String> {
         s.map(|v| clean(&v)).filter(|v| {

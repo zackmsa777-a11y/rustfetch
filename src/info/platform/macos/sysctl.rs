@@ -12,11 +12,7 @@ pub fn sysctl_raw(name: &str, buf: &mut [u8]) -> Option<usize> {
             0,
         )
     };
-    if rc == 0 {
-        Some(len)
-    } else {
-        None
-    }
+    if rc == 0 { Some(len) } else { None }
 }
 
 pub fn sysctl_string(name: &str) -> Option<String> {

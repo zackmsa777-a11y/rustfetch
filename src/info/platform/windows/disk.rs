@@ -26,7 +26,11 @@ pub fn detect_disks(custom_paths: Option<&[String]>) -> Option<Vec<String>> {
             results.push(info);
         }
     }
-    if results.is_empty() { None } else { Some(results) }
+    if results.is_empty() {
+        None
+    } else {
+        Some(results)
+    }
 }
 
 fn format_disk_mount(mount_path: &str) -> Option<String> {

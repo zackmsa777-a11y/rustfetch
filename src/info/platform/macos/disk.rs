@@ -27,7 +27,11 @@ pub fn detect_disks(custom_paths: Option<&[String]>) -> Option<Vec<String>> {
             results.push(info);
         }
     }
-    if results.is_empty() { None } else { Some(results) }
+    if results.is_empty() {
+        None
+    } else {
+        Some(results)
+    }
 }
 
 fn format_disk_mount(mount_path: &str) -> Option<String> {
@@ -46,6 +50,10 @@ fn format_disk_mount(mount_path: &str) -> Option<String> {
     let fstype = unsafe { CStr::from_ptr(st.f_fstypename.as_ptr()) }
         .to_string_lossy()
         .to_string();
-    let fstype = if fstype.is_empty() { "apfs".into() } else { fstype };
+    let fstype = if fstype.is_empty() {
+        "apfs".into()
+    } else {
+        fstype
+    };
     Some(format!("{mount_path}: {usage} - {fstype}"))
 }
