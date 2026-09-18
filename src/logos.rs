@@ -592,14 +592,8 @@ pub const ALL_LOGOS: &[&str] = &[
     "zorin",
 ];
 
-pub fn get_logo(
-    name: &str,
-    no_color: bool,
-    color_override: Option<&str>,
-) -> (Vec<String>, &'static str) {
-    let r = if no_color { "" } else { "\x1b[0m" };
-
-    let (art, default_col): (&[&str], &'static str) = match name.to_lowercase().as_str() {
+pub fn logo_art(name: &str) -> (&'static [&'static str], &'static str) {
+    match name.to_lowercase().as_str() {
         "ubuntu" => (UBUNTU_LOGO, "\x1b[1;31m"),
         "debian" => (DEBIAN_LOGO, "\x1b[1;31m"),
         "arch" | "archlinux" | "archarm" => (ARCH_LOGO, "\x1b[1;36m"),
@@ -647,7 +641,17 @@ pub fn get_logo(
         "bedrock" | "bedrocklinux" => (BEDROCK_LOGO, "\x1b[1;37m"),
         "rust" | "ferris" => (RUST_LOGO, "\x1b[1;31m"),
         _ => (LINUX_LOGO, "\x1b[1;33m"),
-    };
+    }
+}
+
+#[allow(dead_code)]
+pub fn get_logo(
+    name: &str,
+    no_color: bool,
+    color_override: Option<&str>,
+) -> (Vec<String>, &'static str) {
+    let r = if no_color { "" } else { "\x1b[0m" };
+    let (art, default_col) = logo_art(name);
 
     let col = if no_color {
         ""

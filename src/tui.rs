@@ -1,102 +1,100 @@
-use crate::config::{self, parse_color};
+use crate::banner;
+use crate::config::{self, Config, ThemeDef, ThemeEntry, ThemeSource, parse_color};
 use crate::info::types::SystemInfo;
-use crate::printer::{PrintOptions, print_fetch};
+use crate::printer::{render_lines, style_from_theme};
+use crate::utils::visible_width;
 use std::io::{self, Read, Write};
 use std::os::unix::io::AsRawFd;
+use std::path::Path;
 
-/// Short module list used for theme previews.
-const PREVIEW_STRUCTURE: &[&str] = &[
-    "title",
-    "separator",
-    "os",
-    "kernel",
-    "cpu",
-    "memory",
-    "colors",
-];
-
-/// Resolve display-ready parts for a theme name against a config.
-fn parts_for(cfg: &config::Config, name: &str) -> config::ThemeColors {
-    config::lookup_theme(cfg, name).unwrap_or_default()
-}
-
-/// One-line color swatch describing a theme.
-pub fn describe(name: &str, colors: &config::ThemeColors) -> String {
-    let mut bits = Vec::new();
-    if let Some(t) = colors.title.as_deref() {
-        bits.push(format!("title={t}"));
-    }
-    if let Some(k) = colors.keys.as_deref() {
-        bits.push(format!("keys={k}"));
-    }
-    if let Some(v) = colors.value.as_deref() {
-        bits.push(format!("value={v}"));
-    }
-    if let Some(s) = colors.separator.as_deref() {
-        bits.push(format!("sep={s:?}"));
-    }
-    if let Some(l) = colors.logo_color.as_deref() {
-        bits.push(format!("logo={l}"));
-    }
-    if bits.is_empty() {
-        format!("{name} (distro default colors)")
+/// Short summary description for a theme.
+pub fn describe(name: &str, theme: &ThemeDef) -> String {
+    if let Some(ref desc) = theme.description {
+        format!("{name} - {desc}")
     } else {
-        format!("{name} ({})", bits.join(", "))
+        let summary = theme.summary();
+        if summary.is_empty() {
+            format!("{name} (default)")
+        } else {
+            format!("{name} ({summary})")
+        }
     }
 }
 
-fn is_custom(cfg: &config::Config, name: &str) -> bool {
-    cfg.themes.as_ref().is_some_and(|m| {
-        m.keys().any(|k| k.eq_ignore_ascii_case(name))
-            && !config::BUILTIN_THEME_NAMES
-                .iter()
-                .any(|b| b.eq_ignore_ascii_case(name))
-    })
-}
-
-/// Print a live preview of every available theme using real system info.
+/// Print a live preview of every available theme to stdout.
 pub fn preview_all(
     info: &SystemInfo,
-    cfg: &config::Config,
+    cfg: &Config,
     no_color: bool,
     no_logo: bool,
     logo_override: Option<&str>,
 ) {
-    let names = config::all_theme_names(cfg);
-    let structure: Vec<String> = PREVIEW_STRUCTURE.iter().map(|s| s.to_string()).collect();
-    for name in &names {
-        let colors = parts_for(cfg, name);
-        let tag = if is_custom(cfg, name) {
-            "custom"
+    let themes = config::all_themes(cfg);
+    println!(
+        "\x1b[1;36m=== rustfetch theme gallery ({} available) ===\x1b[0m\n",
+        themes.len()
+    );
+
+    for entry in &themes {
+        let tag = entry.source.tag();
+        let layout_tag = if entry.def.has_layout() {
+            " [layout]"
         } else {
-            "built-in"
+            ""
         };
-        println!("=== {name} [{tag}] ===");
-        println!("    {}", describe(name, &colors));
-        let opts = PrintOptions {
-            no_color,
-            no_logo,
-            logo_override,
-            logo_color: colors.logo_color.as_deref(),
-            key_color: colors.keys.as_deref(),
-            title_color: colors.title.as_deref(),
-            value_color: colors.value.as_deref(),
-            separator: colors.separator.as_deref(),
-            structure: Some(&structure),
-            json: false,
-        };
-        print_fetch(info, &opts);
+        println!(
+            "\x1b[1;33m--- Theme: {} [{tag}]{layout_tag} ---\x1b[0m",
+            entry.name
+        );
+        if let Some(ref desc) = entry.def.description {
+            println!("    \x1b[90m{desc}\x1b[0m");
+        }
+
+        let mut style = style_from_theme(&entry.def);
+        if no_color {
+            style.no_color = true;
+        }
+        if no_logo {
+            style.no_logo = true;
+        }
+        if let Some(logo) = logo_override {
+            style.logo = Some(logo.to_string());
+        }
+
+        for line in render_lines(info, &style) {
+            println!("  {line}");
+        }
         println!();
     }
-    println!("Use `rustfetch --theme <NAME>` to try one, `--themes` for the picker,");
-    println!("or `--set-theme <NAME>` to save it as default.");
+
+    println!(
+        "\x1b[1;32mUse `rustfetch --setup` to choose interactively with live full-screen preview,\x1b[0m"
+    );
+    println!("or `rustfetch --theme <NAME>` to try one once.");
 }
 
-// ---------- interactive picker (no new dependencies) ----------
+// ---------------- Terminal Helpers & Raw Mode ----------------
+
+#[cfg(unix)]
+pub fn terminal_dimensions() -> (usize, usize) {
+    let mut ws: libc::winsize = unsafe { std::mem::zeroed() };
+    let res = unsafe { libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut ws) };
+    if res == 0 && ws.ws_col > 0 && ws.ws_row > 0 {
+        (ws.ws_col as usize, ws.ws_row as usize)
+    } else {
+        (80, 24)
+    }
+}
+
+#[cfg(not(unix))]
+pub fn terminal_dimensions() -> (usize, usize) {
+    (80, 24)
+}
 
 fn stdin_is_tty() -> bool {
     unsafe { libc::isatty(io::stdin().as_raw_fd()) != 0 }
 }
+
 #[cfg(unix)]
 fn bytes_available(fd: i32) -> usize {
     let mut n: libc::c_int = 0;
@@ -109,38 +107,48 @@ fn bytes_available(fd: i32) -> usize {
 }
 
 #[cfg(unix)]
-struct RawGuard {
+struct TerminalGuard {
     fd: i32,
     orig: libc::termios,
 }
 
 #[cfg(unix)]
-impl RawGuard {
+impl TerminalGuard {
     fn enter() -> Result<Self, String> {
-        use std::os::unix::io::AsRawFd;
         let fd = io::stdin().as_raw_fd();
         unsafe {
-            let mut t: libc::termios = std::mem::zeroed();
-            if libc::tcgetattr(fd, &mut t) != 0 {
+            let mut orig: libc::termios = std::mem::zeroed();
+            if libc::tcgetattr(fd, &mut orig) != 0 {
                 return Err("tcgetattr failed".into());
             }
-            let orig = t;
-            t.c_lflag &= !(libc::ICANON | libc::ECHO);
-            t.c_cc[libc::VMIN] = 1;
-            t.c_cc[libc::VTIME] = 0;
-            if libc::tcsetattr(fd, libc::TCSANOW, &t) != 0 {
+            let mut raw = orig;
+            // Disable canonical mode, echo, and ISIG (so Ctrl-C is received as byte 0x03)
+            raw.c_lflag &= !(libc::ICANON | libc::ECHO | libc::ISIG);
+            raw.c_cc[libc::VMIN] = 1;
+            raw.c_cc[libc::VTIME] = 0;
+            if libc::tcsetattr(fd, libc::TCSADRAIN, &raw) != 0 {
                 return Err("tcsetattr failed".into());
             }
+
+            let mut out = io::stdout();
+            // Alternate screen buffer, hide cursor, clear
+            let _ = write!(out, "\x1b[?1049h\x1b[?25l\x1b[2J\x1b[H");
+            let _ = out.flush();
+
             Ok(Self { fd, orig })
         }
     }
 }
 
 #[cfg(unix)]
-impl Drop for RawGuard {
+impl Drop for TerminalGuard {
     fn drop(&mut self) {
+        let mut out = io::stdout();
+        // Restore cursor, leave alternate screen buffer
+        let _ = write!(out, "\x1b[?25h\x1b[?1049l");
+        let _ = out.flush();
         unsafe {
-            libc::tcsetattr(self.fd, libc::TCSANOW, &self.orig);
+            libc::tcsetattr(self.fd, libc::TCSADRAIN, &self.orig);
         }
     }
 }
@@ -148,15 +156,18 @@ impl Drop for RawGuard {
 enum Key {
     Up,
     Down,
+    PageUp,
+    PageDown,
+    Home,
+    End,
     Enter,
+    Export,
     Quit,
-    Save,
     Other,
 }
 
 #[cfg(unix)]
 fn read_key() -> Key {
-    use std::os::unix::io::AsRawFd;
     let fd = io::stdin().as_raw_fd();
     let mut buf = [0u8; 1];
     let stdin = io::stdin();
@@ -166,22 +177,50 @@ fn read_key() -> Key {
     }
     match buf[0] {
         b'\r' | b'\n' => Key::Enter,
-        b'q' | b'Q' => Key::Quit,
-        b's' | b'S' => Key::Save,
+        b'q' | b'Q' | 0x03 | 0x04 => Key::Quit, // q, Q, Ctrl-C, Ctrl-D
+        b'e' | b'E' => Key::Export,
         b'k' | b'K' => Key::Up,
         b'j' | b'J' => Key::Down,
+        b'g' => Key::Home,
+        b'G' => Key::End,
         0x1b => {
             if bytes_available(fd) == 0 {
-                return Key::Quit;
+                return Key::Quit; // standalone Esc
             }
-            let mut seq = [0u8; 2];
+            let mut seq = [0u8; 1];
             if lock.read_exact(&mut seq).is_err() {
                 return Key::Quit;
             }
             if seq[0] == b'[' {
-                match seq[1] {
+                let mut code = [0u8; 1];
+                if lock.read_exact(&mut code).is_err() {
+                    return Key::Other;
+                }
+                match code[0] {
                     b'A' => Key::Up,
                     b'B' => Key::Down,
+                    b'H' => Key::Home,
+                    b'F' => Key::End,
+                    b'5' => {
+                        let mut t = [0u8; 1];
+                        let _ = lock.read_exact(&mut t);
+                        Key::PageUp
+                    }
+                    b'6' => {
+                        let mut t = [0u8; 1];
+                        let _ = lock.read_exact(&mut t);
+                        Key::PageDown
+                    }
+                    b'1' => {
+                        let mut t = [0u8; 1];
+                        let _ = lock.read_exact(&mut t);
+                        Key::Home
+                    }
+                    b'4' => {
+                        let mut t = [0u8; 1];
+                        let _ = lock.read_exact(&mut t);
+                        Key::End
+                    }
                     _ => Key::Other,
                 }
             } else {
@@ -192,149 +231,463 @@ fn read_key() -> Key {
     }
 }
 
-fn render_picker(
+// ---------------- Full Screen TUI Renderer ----------------
+
+fn truncate_visible(s: &str, max_width: usize) -> String {
+    if visible_width(s) <= max_width {
+        return s.to_string();
+    }
+    let mut out = String::new();
+    let mut in_esc = false;
+    let mut vis = 0;
+    for c in s.chars() {
+        if in_esc {
+            out.push(c);
+            if c.is_ascii_alphabetic() {
+                in_esc = false;
+            }
+        } else if c == '\x1b' {
+            in_esc = true;
+            out.push(c);
+        } else {
+            if vis >= max_width {
+                break;
+            }
+            out.push(c);
+            vis += 1;
+        }
+    }
+    out.push_str("\x1b[0m");
+    out
+}
+
+fn pad_right_visible(s: &str, target_width: usize) -> String {
+    let w = visible_width(s);
+    if w >= target_width {
+        truncate_visible(s, target_width)
+    } else {
+        format!("{s}{}", " ".repeat(target_width - w))
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_tui(
     info: &SystemInfo,
-    cfg: &config::Config,
-    names: &[String],
+    _cfg: &Config,
+    themes: &[ThemeEntry],
     selected: usize,
+    active_theme_name: Option<&str>,
+    status_msg: Option<&str>,
     no_logo: bool,
     logo_override: Option<&str>,
 ) {
+    let (cols, rows) = terminal_dimensions();
     let mut out = io::stdout();
-    let _ = write!(out, "\x1b[2J\x1b[H");
-    let _ = writeln!(
-        out,
-        "rustfetch themes  (up/down or j/k, Enter = save & quit, s = save, q/Esc = quit)"
-    );
-    let _ = writeln!(out);
-    for (i, name) in names.iter().enumerate() {
-        let colors = parts_for(cfg, name);
-        // Small colored dot preview using the keys color.
-        let dot = match colors.keys.as_deref().and_then(parse_color) {
-            Some(c) => format!("{c}\u{25cf}\x1b[0m"),
-            None => "\u{25cb}".to_string(),
-        };
-        let tag = if is_custom(cfg, name) { "*" } else { " " };
-        if i == selected {
-            let _ = writeln!(out, "> [{tag}] {dot} {name}");
-        } else {
-            let _ = writeln!(out, "  [{tag}] {dot} {name}");
+    let mut screen = String::with_capacity(16384);
+
+    // Jump to top-left and prepare frame
+    screen.push_str("\x1b[H");
+
+    // 1. ASCII ART BANNER AT TOP
+    let mut header_rows = 0;
+    if let Some(art_lines) = banner::for_width(cols) {
+        for (i, line) in art_lines.iter().enumerate() {
+            let colorized = banner::colorize(line, i, false);
+            let pad = (cols.saturating_sub(visible_width(line))) / 2;
+            screen.push_str(&" ".repeat(pad));
+            screen.push_str(&colorized);
+            screen.push_str("\x1b[K\r\n");
+            header_rows += 1;
         }
     }
-    let _ = writeln!(
-        out,
-        "\n* = your custom theme from config `themes`. Legend above."
-    );
-    let name = &names[selected];
-    let colors = parts_for(cfg, name);
-    let _ = writeln!(out, "--- preview: {} ---", describe(name, &colors));
-    let _ = out.flush();
 
-    // Full live preview with the highlighted theme.
-    let opts = PrintOptions {
-        no_color: false,
-        no_logo,
-        logo_override,
-        logo_color: colors.logo_color.as_deref(),
-        key_color: colors.keys.as_deref(),
-        title_color: colors.title.as_deref(),
-        value_color: colors.value.as_deref(),
-        separator: colors.separator.as_deref(),
-        structure: None,
-        json: false,
-    };
-    print_fetch(info, &opts);
-    let _ = writeln!(out);
-    let _ = writeln!(
-        out,
-        "[{}] {}",
-        names[selected],
-        describe(&names[selected], &colors)
+    // Subtitle / Tagline
+    let subtitle = format!(
+        "⚡ rustfetch v{} ─ {} ⚡",
+        env!("CARGO_PKG_VERSION"),
+        banner::TAGLINE
     );
+    let sub_pad = (cols.saturating_sub(visible_width(&subtitle))) / 2;
+    screen.push_str(&" ".repeat(sub_pad));
+    screen.push_str("\x1b[1;33m");
+    screen.push_str(&subtitle);
+    screen.push_str("\x1b[0m\x1b[K\r\n");
+    header_rows += 1;
+
+    // Horizontal divider
+    let divider = "─".repeat(cols);
+    screen.push_str("\x1b[90m");
+    screen.push_str(&divider);
+    screen.push_str("\x1b[0m\x1b[K\r\n");
+    header_rows += 1;
+
+    // Calculate layout areas
+    let footer_rows = 3;
+    let main_rows = rows.saturating_sub(header_rows + footer_rows).max(6);
+
+    let sel_entry = &themes[selected];
+    let is_split = cols >= 88;
+
+    if is_split {
+        // Split Screen: Left Pane = Theme List (~36 cols), Right Pane = Live Preview
+        let left_width = 38.min(cols / 3 + 6);
+        let right_width = cols.saturating_sub(left_width + 3);
+
+        // Pre-render preview for right pane
+        let mut style = style_from_theme(&sel_entry.def);
+        if no_logo {
+            style.no_logo = true;
+        }
+        if let Some(logo) = logo_override {
+            style.logo = Some(logo.to_string());
+        }
+        let preview_lines = render_lines(info, &style);
+
+        // Scroll window for left pane
+        let max_list_items = main_rows.saturating_sub(2);
+        let scroll_offset = if selected < max_list_items / 2 {
+            0
+        } else if selected + max_list_items / 2 >= themes.len() {
+            themes.len().saturating_sub(max_list_items)
+        } else {
+            selected.saturating_sub(max_list_items / 2)
+        };
+
+        // Header for columns
+        let list_header = format!(
+            "┌─ Themes ({}/{}) ─{}",
+            selected + 1,
+            themes.len(),
+            "─".repeat(
+                left_width.saturating_sub(18 + format!("{}/{}", selected + 1, themes.len()).len())
+            )
+        );
+        let preview_title = format!(
+            " Live Preview: {} [{}] ",
+            sel_entry.name,
+            sel_entry.source.tag()
+        );
+        let preview_header = format!(
+            "┌─{}─{}",
+            preview_title,
+            "─".repeat(right_width.saturating_sub(visible_width(&preview_title) + 2))
+        );
+
+        screen.push_str("\x1b[1;36m");
+        screen.push_str(&pad_right_visible(&list_header, left_width));
+        screen.push_str(" │ ");
+        screen.push_str(&pad_right_visible(&preview_header, right_width));
+        screen.push_str("\x1b[0m\x1b[K\r\n");
+
+        for row in 0..main_rows.saturating_sub(1) {
+            // Left pane content
+            let theme_idx = scroll_offset + row;
+            let left_cell = if theme_idx < themes.len() {
+                let t = &themes[theme_idx];
+                let is_sel = theme_idx == selected;
+                let is_active = active_theme_name.is_some_and(|a| a.eq_ignore_ascii_case(&t.name));
+
+                let dot_col = t
+                    .def
+                    .keys
+                    .as_deref()
+                    .or(t.def.title.as_deref())
+                    .and_then(parse_color)
+                    .unwrap_or_else(|| "\x1b[37m".to_string());
+
+                let prefix = if is_sel { "\x1b[1;32m▸ " } else { "  " };
+                let dot = format!("{dot_col}●\x1b[0m");
+
+                let tag_str = match t.source {
+                    ThemeSource::Builtin => "\x1b[90mpreset\x1b[0m",
+                    ThemeSource::File(_) => "\x1b[33mfile\x1b[0m",
+                    ThemeSource::Config => "\x1b[35mcfg\x1b[0m",
+                };
+
+                let active_marker = if is_active {
+                    "\x1b[1;32m✓\x1b[0m"
+                } else {
+                    " "
+                };
+                let layout_flag = if t.def.has_layout() {
+                    "\x1b[36m*\x1b[0m"
+                } else {
+                    " "
+                };
+
+                let name_display = if is_sel {
+                    format!("\x1b[1;37;44m {:<12}\x1b[0m", t.name)
+                } else {
+                    format!("{:<13}", t.name)
+                };
+
+                format!("{prefix}{active_marker}{dot} {name_display} {tag_str}{layout_flag}")
+            } else {
+                String::new()
+            };
+
+            // Right pane content
+            let right_cell = if row == 0 {
+                // Description line on top of preview
+                if let Some(ref desc) = sel_entry.def.description {
+                    format!("\x1b[3m\x1b[90m// {desc}\x1b[0m")
+                } else {
+                    format!("\x1b[90m// {}\x1b[0m", sel_entry.def.summary())
+                }
+            } else {
+                let p_idx = row.saturating_sub(1);
+                preview_lines.get(p_idx).cloned().unwrap_or_default()
+            };
+
+            let left_formatted = pad_right_visible(&left_cell, left_width);
+            let right_formatted = pad_right_visible(&right_cell, right_width);
+
+            screen.push_str(&left_formatted);
+            screen.push_str("\x1b[90m │ \x1b[0m");
+            screen.push_str(&right_formatted);
+            screen.push_str("\x1b[K\r\n");
+        }
+    } else {
+        // Narrow Terminal: Single column selector with info below
+        let max_list = (main_rows / 2).max(4);
+        let scroll_offset = if selected < max_list / 2 {
+            0
+        } else if selected + max_list / 2 >= themes.len() {
+            themes.len().saturating_sub(max_list)
+        } else {
+            selected.saturating_sub(max_list / 2)
+        };
+
+        screen.push_str(&format!(
+            "\x1b[1;36m── Themes ({}/{}) ────────────────────────\x1b[0m\x1b[K\r\n",
+            selected + 1,
+            themes.len()
+        ));
+
+        for row in 0..max_list {
+            let idx = scroll_offset + row;
+            if idx < themes.len() {
+                let t = &themes[idx];
+                let is_sel = idx == selected;
+                let dot_col = t
+                    .def
+                    .keys
+                    .as_deref()
+                    .and_then(parse_color)
+                    .unwrap_or_default();
+                let prefix = if is_sel {
+                    "\x1b[1;32m▸ \x1b[1;37m"
+                } else {
+                    "  \x1b[0m"
+                };
+                screen.push_str(&format!(
+                    "{prefix}{dot_col}●\x1b[0m {:<14} [{}]\x1b[0m\x1b[K\r\n",
+                    t.name,
+                    t.source.tag()
+                ));
+            }
+        }
+
+        // Preview snippet below
+        screen.push_str("\x1b[1;36m── Preview ───────────────────────────────\x1b[0m\x1b[K\r\n");
+        let mut style = style_from_theme(&sel_entry.def);
+        if no_logo {
+            style.no_logo = true;
+        }
+        let preview_lines = render_lines(info, &style);
+        let rem_rows = main_rows.saturating_sub(max_list + 2);
+        for i in 0..rem_rows {
+            if let Some(line) = preview_lines.get(i) {
+                screen.push_str(&truncate_visible(line, cols));
+            }
+            screen.push_str("\x1b[K\r\n");
+        }
+    }
+
+    // 3. FOOTER
+    screen.push_str("\x1b[90m");
+    screen.push_str(&"─".repeat(cols));
+    screen.push_str("\x1b[0m\x1b[K\r\n");
+
+    // Shortcut bar
+    let keys_hint = "\x1b[1;37m[↑/k, ↓/j]\x1b[0m Select  \x1b[1;32m[Enter]\x1b[0m Apply & Save  \x1b[1;33m[e]\x1b[0m Export Theme  \x1b[1;31m[q/Esc]\x1b[0m Quit";
+    let active_name_str = active_theme_name.unwrap_or("default");
+    let active_status = format!("Active: \x1b[1;32m{active_name_str}\x1b[0m");
+
+    let spacing = cols.saturating_sub(visible_width(keys_hint) + visible_width(&active_status));
+    screen.push_str(keys_hint);
+    screen.push_str(&" ".repeat(spacing));
+    screen.push_str(&active_status);
+    screen.push_str("\x1b[K\r\n");
+
+    // Status or hint message line
+    if let Some(msg) = status_msg {
+        screen.push_str(msg);
+    } else {
+        screen.push_str("\x1b[90mTip: Drop custom *.jsonc presets into ~/.config/rustfetch/themes/ or define in config\x1b[0m");
+    }
+    screen.push_str("\x1b[K");
+
+    let _ = write!(out, "{screen}");
     let _ = out.flush();
 }
 
-/// Numbered fallback when stdin is not a TTY.
+// ---------------- Numbered Non-Interactive Fallback ----------------
+
 fn numbered_fallback(
-    cfg: &config::Config,
-    names: &[String],
-    config_path: Option<&std::path::Path>,
+    _cfg: &Config,
+    themes: &[ThemeEntry],
+    config_path: Option<&Path>,
 ) -> Result<(), String> {
-    println!("rustfetch themes (non-interactive terminal):");
-    for (i, name) in names.iter().enumerate() {
-        let colors = parts_for(cfg, name);
-        println!("  {}. {}", i + 1, describe(name, &colors));
+    println!("\x1b[1;36mrustfetch themes (non-interactive mode):\x1b[0m\n");
+    for (i, entry) in themes.iter().enumerate() {
+        let tag = entry.source.tag();
+        let desc = entry.def.description.as_deref().unwrap_or("");
+        println!(
+            "  \x1b[1;33m{:>2}.\x1b[0m {:<14} [{:<7}] {}",
+            i + 1,
+            entry.name,
+            tag,
+            desc
+        );
     }
-    print!("Enter number to save (or 0 to quit): ");
+    print!("\nEnter number to save as default (or 0 to quit): ");
     let _ = io::stdout().flush();
     let mut line = String::new();
     io::stdin()
         .read_line(&mut line)
         .map_err(|e| e.to_string())?;
     let n: usize = line.trim().parse().unwrap_or(0);
-    if n == 0 || n > names.len() {
+    if n == 0 || n > themes.len() {
         println!("No changes saved.");
         return Ok(());
     }
-    let saved = config::save_theme_name(config_path, &names[n - 1])?;
-    println!("Saved theme '{}' to {}", names[n - 1], saved.display());
+    let chosen = &themes[n - 1].name;
+    let saved = config::save_theme_name(config_path, chosen)?;
+    println!(
+        "\x1b[1;32m✓ Saved theme '{chosen}' to {}\x1b[0m",
+        saved.display()
+    );
     Ok(())
 }
 
-pub fn run_picker(
+// ---------------- Main TUI Entry Point ----------------
+
+pub fn run_setup(
     info: &SystemInfo,
-    cfg: &config::Config,
-    config_path: Option<&std::path::Path>,
+    cfg: &Config,
+    config_path: Option<&Path>,
     no_logo: bool,
     logo_override: Option<&str>,
 ) -> Result<(), String> {
-    let names = config::all_theme_names(cfg);
-    if names.is_empty() {
+    let themes = config::all_themes(cfg);
+    if themes.is_empty() {
         return Err("no themes available".into());
     }
 
     if !stdin_is_tty() {
-        return numbered_fallback(cfg, &names, config_path);
+        return numbered_fallback(cfg, &themes, config_path);
     }
 
     #[cfg(not(unix))]
     {
-        return numbered_fallback(cfg, &names, config_path);
+        return numbered_fallback(cfg, &themes, config_path);
     }
 
     #[cfg(unix)]
     {
-        let _raw = RawGuard::enter()?;
-        // Start on the currently configured theme if it exists.
-        let mut selected = cfg
-            .theme
-            .as_ref()
-            .and_then(|t| t.name())
-            .and_then(|n| names.iter().position(|x| x.eq_ignore_ascii_case(n)))
+        let _guard = TerminalGuard::enter()?;
+
+        let active_name = config::active_theme_name(cfg);
+        let mut selected = active_name
+            .as_deref()
+            .and_then(|act| themes.iter().position(|t| t.name.eq_ignore_ascii_case(act)))
             .unwrap_or(0);
 
+        let mut status_msg: Option<String> = None;
+
         loop {
-            render_picker(info, cfg, &names, selected, no_logo, logo_override);
+            render_tui(
+                info,
+                cfg,
+                &themes,
+                selected,
+                active_name.as_deref(),
+                status_msg.as_deref(),
+                no_logo,
+                logo_override,
+            );
+
             match read_key() {
                 Key::Up => {
-                    selected = selected.checked_sub(1).unwrap_or(names.len() - 1);
+                    selected = selected.checked_sub(1).unwrap_or(themes.len() - 1);
+                    status_msg = None;
                 }
                 Key::Down => {
-                    selected = (selected + 1) % names.len();
+                    selected = (selected + 1) % themes.len();
+                    status_msg = None;
                 }
-                Key::Enter | Key::Save => {
-                    drop(_raw);
-                    let saved = config::save_theme_name(config_path, &names[selected])?;
-                    println!("\nSaved theme '{}' to {}", names[selected], saved.display());
+                Key::PageUp => {
+                    selected = selected.saturating_sub(5);
+                    status_msg = None;
+                }
+                Key::PageDown => {
+                    selected = (selected + 5).min(themes.len() - 1);
+                    status_msg = None;
+                }
+                Key::Home => {
+                    selected = 0;
+                    status_msg = None;
+                }
+                Key::End => {
+                    selected = themes.len() - 1;
+                    status_msg = None;
+                }
+                Key::Export => {
+                    let entry = &themes[selected];
+                    let export_name = format!("{}-custom", entry.name);
+                    match config::export_theme(config_path, &entry.def, &export_name) {
+                        Ok(target) => {
+                            status_msg = Some(format!(
+                                "\x1b[1;32m✓ Exported theme '{}' to {} and set active!\x1b[0m",
+                                export_name,
+                                target.display()
+                            ));
+                        }
+                        Err(e) => {
+                            status_msg =
+                                Some(format!("\x1b[1;31m✗ Failed to export theme: {e}\x1b[0m"));
+                        }
+                    }
+                }
+                Key::Enter => {
+                    drop(_guard);
+                    let chosen = &themes[selected].name;
+                    let target = config::save_theme_name(config_path, chosen)?;
+                    println!(
+                        "\x1b[1;32m✓ Theme '{chosen}' successfully applied and saved to {}\x1b[0m",
+                        target.display()
+                    );
                     return Ok(());
                 }
                 Key::Quit => {
-                    drop(_raw);
-                    println!("\nNo changes saved.");
+                    drop(_guard);
+                    println!("Setup closed without saving changes.");
                     return Ok(());
                 }
                 Key::Other => {}
             }
         }
     }
+}
+
+/// Backwards compatibility alias for `--theme-picker` / `--themes`.
+pub fn run_picker(
+    info: &SystemInfo,
+    cfg: &Config,
+    config_path: Option<&Path>,
+    no_logo: bool,
+    logo_override: Option<&str>,
+) -> Result<(), String> {
+    run_setup(info, cfg, config_path, no_logo, logo_override)
 }

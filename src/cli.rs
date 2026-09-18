@@ -36,7 +36,7 @@ pub fn parse_cli(args: &[String]) -> Result<CliOptions, String> {
             "--list-modules" => opts.list_modules = true,
             "--list-themes" => opts.list_themes = true,
             "--preview-themes" => opts.preview_themes = true,
-            "--themes" | "--theme-picker" | "--tui" => opts.theme_picker = true,
+            "--setup" | "--themes" | "--theme-picker" | "--tui" => opts.theme_picker = true,
             "--theme" => {
                 if let Some(val) = iter.next() {
                     opts.theme = Some(val.clone());
@@ -136,18 +136,19 @@ pub fn print_help() {
     println!("    --gen-config           Print default JSON configuration to stdout");
     println!("    --list-logos           List all supported distro and OS logos");
     println!("    --list-modules         List all available information modules");
-    println!("    --list-themes          List all available color themes");
+    println!("    --list-themes          List all available color themes and layouts");
     println!("    --theme <NAME>         Use a theme once without saving");
     println!("    --set-theme <NAME>     Save a theme as default in the config file");
     println!("    --preview-themes       Print a live preview of every theme");
-    println!("    --themes               Interactive theme picker (TUI) with live preview");
+    println!("    --setup, --themes      Interactive full-screen theme & layout setup TUI");
     println!("    --json                 Output system information in structured JSON format");
     println!("    -v, --version          Print version information");
     println!("    -h, --help             Print help information\n");
     println!("EXAMPLES:");
+    println!("    rustfetch --setup");
+    println!("    rustfetch --theme groups");
+    println!("    rustfetch --theme nyarch");
     println!("    rustfetch --logo arch");
-    println!("    rustfetch --theme gruvbox");
-    println!("    rustfetch --themes");
     println!("    rustfetch --no-logo");
     println!("    rustfetch --structure title:os:kernel:cpu:gpu:memory:colors");
     println!("    rustfetch --json");

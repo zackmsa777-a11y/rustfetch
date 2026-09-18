@@ -1,7 +1,10 @@
+mod art;
+mod banner;
 mod cli;
 mod config;
 mod info;
 mod logos;
+mod presets;
 mod printer;
 mod tui;
 mod utils;
@@ -10,7 +13,6 @@ use cli::{parse_cli, print_help, print_modules};
 use config::{generate_default_config, load_config};
 use info::gather_info;
 use logos::ALL_LOGOS;
-use printer::{PrintOptions, print_fetch};
 use std::env;
 
 fn main() {
@@ -55,20 +57,17 @@ fn main() {
 
     if cli_opts.list_themes {
         println!("Available rustfetch themes:");
-        for name in config::all_theme_names(&file_cfg) {
-            let colors = config::lookup_theme(&file_cfg, &name).unwrap_or_default();
-            println!("  - {}", tui::describe(&name, &colors));
+        for entry in config::all_themes(&file_cfg) {
+            println!("  - {}", tui::describe(&entry.name, &entry.def));
         }
-        println!("\nCustom themes: add a `themes` map to your config:");
         println!(
-            "  \"themes\": {{ \"my-theme\": {{ \"keys\": \"cyan\", \"value\": \"white\" }} }}"
+            "\nCustom themes: add .jsonc files to ~/.config/rustfetch/themes/ or define in config."
         );
-        println!("Then `rustfetch --theme my-theme`, `--preview-themes`, or `--themes`.");
+        println!("Run `rustfetch --setup` to launch the interactive full-screen setup gallery.");
         return;
     }
 
     let cfg_logo_name = file_cfg.get_logo_name();
-    let cfg_logo_color = file_cfg.get_logo_color();
     let cfg_modules = file_cfg.get_normalized_modules();
 
     let effective_no_color = cli_opts.no_color || file_cfg.no_color.unwrap_or(false);
@@ -138,46 +137,58 @@ fn main() {
 
     // Theme resolution order: --theme flag > config theme (+ custom themes
     // override built-in presets of the same name) > legacy display colors.
-    let merged: config::ThemeColors = if let Some(name) = cli_opts.theme.as_deref() {
-        config::lookup_theme(&file_cfg, name).unwrap_or_default()
-    } else {
-        config::active_theme(&file_cfg).1
-    };
+    let resolved_entry = config::resolve_active_theme(&file_cfg, cli_opts.theme.as_deref());
+    let mut style = printer::style_from_theme(&resolved_entry.def);
 
+    if effective_no_color {
+        style.no_color = true;
+    }
+    if effective_no_logo {
+        style.no_logo = true;
+    }
+    if let Some(logo) = effective_logo {
+        style.logo = Some(logo.to_string());
+    }
     let cfg_key_color = file_cfg.get_key_color();
-    let keys_raw = merged
-        .keys
-        .as_deref()
-        .or(cfg_key_color.as_deref())
-        .filter(|s| *s != "auto");
-    let title_raw = merged.title.as_deref().filter(|s| *s != "auto");
-    let value_raw = merged.value.as_deref().filter(|s| *s != "auto");
-    let separator_raw = merged.separator.as_deref().or_else(|| {
-        file_cfg
-            .display
-            .as_ref()
-            .and_then(|d| d.separator.as_deref())
-    });
+    if let Some(ref kcol) = cfg_key_color
+        && style.key_color.is_none()
+    {
+        style.key_color = Some(kcol.clone());
+    }
+    let cfg_logo_color = file_cfg.get_logo_color();
     let effective_logo_color = cli_opts
         .logo_color
         .as_deref()
-        .or(merged.logo_color.as_deref())
+        .or(style.logo_color.as_deref())
         .or_else(|| cfg_logo_color.as_deref().filter(|s| *s != "auto"));
+    if let Some(lcol) = effective_logo_color {
+        style.logo_color = Some(lcol.to_string());
+    }
+    if let Some(structure) = effective_structure {
+        style.modules = Some(
+            structure
+                .iter()
+                .map(|name| config::ModuleSpec {
+                    kind: config::normalize_module_name(name),
+                    ..Default::default()
+                })
+                .collect(),
+        );
+    }
+    if style.separator.is_none()
+        && let Some(d) = file_cfg.display.as_ref()
+        && let Some(ref s) = d.separator
+    {
+        style.separator = Some(s.clone());
+    }
 
-    let print_opts = PrintOptions {
-        no_color: effective_no_color,
-        no_logo: effective_no_logo,
-        logo_override: effective_logo,
-        logo_color: effective_logo_color,
-        key_color: keys_raw,
-        title_color: title_raw,
-        value_color: value_raw,
-        separator: separator_raw,
-        structure: effective_structure.map(|v| v.as_slice()),
-        json: cli_opts.json,
-    };
-
-    print_fetch(&system_info, &print_opts);
+    if cli_opts.json {
+        if let Ok(serialized) = serde_json::to_string_pretty(&system_info) {
+            println!("{serialized}");
+        }
+    } else {
+        printer::print_fetch_styled(&system_info, &style);
+    }
 }
 
 #[cfg(test)]
