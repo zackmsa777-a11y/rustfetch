@@ -358,11 +358,7 @@ fn render_tui(
     } else {
         banner::TAGLINE.to_string()
     };
-    let subtitle = format!(
-        "⚡ rustfetch v{} ─ {} ─ [Mouse + Keyboard enabled] ⚡",
-        env!("CARGO_PKG_VERSION"),
-        detected_pc
-    );
+    let subtitle = format!("rustfetch v{} ─ {}", env!("CARGO_PKG_VERSION"), detected_pc);
     let sub_pad = (cols.saturating_sub(visible_width(&subtitle))) / 2;
     screen.push_str(&" ".repeat(sub_pad));
     screen.push_str("\x1b[1;33m");
@@ -455,7 +451,7 @@ fn render_tui(
                 let dot = format!("{dot_col}●\x1b[0m");
 
                 let tag_str = if t.matches_distro(&info.distro_id) {
-                    "\x1b[1;32m★ rec\x1b[0m"
+                    "\x1b[1;32mrec\x1b[0m"
                 } else {
                     match t.source {
                         ThemeSource::Builtin => "\x1b[90mpreset\x1b[0m",
@@ -541,7 +537,7 @@ fn render_tui(
                     "  \x1b[0m"
                 };
                 let tag_str = if t.matches_distro(&info.distro_id) {
-                    "\x1b[1;32m★ rec\x1b[0m"
+                    "\x1b[1;32mrec\x1b[0m"
                 } else {
                     match t.source {
                         ThemeSource::Builtin => "\x1b[90mpreset\x1b[0m",
@@ -578,7 +574,7 @@ fn render_tui(
     screen.push_str("\x1b[0m\x1b[K\r\n");
 
     // Shortcut bar
-    let keys_hint = "\x1b[1;37m[Click / ↑↓]\x1b[0m Select  \x1b[1;32m[Click / Enter]\x1b[0m Apply  \x1b[1;33m[e]\x1b[0m Export  \x1b[1;31m[q]\x1b[0m Quit";
+    let keys_hint = "\x1b[1;37m[↑/↓]\x1b[0m Select  \x1b[1;32m[Enter]\x1b[0m Apply  \x1b[1;33m[e]\x1b[0m Export  \x1b[1;31m[q]\x1b[0m Quit";
     let active_name_str = active_theme_name.unwrap_or("default");
     let active_status = format!("Active: \x1b[1;32m{active_name_str}\x1b[0m");
 
@@ -592,7 +588,7 @@ fn render_tui(
     if let Some(msg) = status_msg {
         screen.push_str(msg);
     } else {
-        screen.push_str("\x1b[90mTip: Click theme to preview, double-click or Enter to apply, scroll wheel to browse\x1b[0m");
+        screen.push_str("\x1b[90mTip: Enter to apply, e to export to ~/.config/rustfetch/config.jsonc, q to quit\x1b[0m");
     }
     screen.push_str("\x1b[K");
 
