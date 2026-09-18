@@ -99,4 +99,3 @@ pub fn detect_host() -> Option<String> {
 
     Some(host_str)
 }
-

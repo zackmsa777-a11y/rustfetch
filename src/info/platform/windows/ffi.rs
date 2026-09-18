@@ -127,13 +127,7 @@ pub fn reg_sz(subkey: &str, value: &str) -> Option<String> {
     unsafe {
         let mut hkey: HKEY = std::ptr::null_mut();
         let sub = wide(subkey);
-        let rc = RegOpenKeyExW(
-            HKEY_LOCAL_MACHINE,
-            sub.as_ptr(),
-            0,
-            KEY_READ,
-            &mut hkey,
-        );
+        let rc = RegOpenKeyExW(HKEY_LOCAL_MACHINE, sub.as_ptr(), 0, KEY_READ, &mut hkey);
         if rc != ERROR_SUCCESS || hkey.is_null() {
             return None;
         }

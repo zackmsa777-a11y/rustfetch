@@ -12,5 +12,9 @@ pub fn detect_hostname() -> Option<String> {
         .trim()
         .to_string();
     let cleaned = clean(&name);
-    if cleaned.is_empty() { None } else { Some(cleaned) }
+    if cleaned.is_empty() {
+        None
+    } else {
+        Some(cleaned)
+    }
 }

@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -65,10 +66,12 @@ jobs:
       - name: Package archive (Unix)
         if: matrix.os != 'windows-latest'
         run: |
-          tar -czvf ${{ matrix.asset_name }} \
-            -C target/${{ matrix.target }}/release ${{ matrix.artifact_name }} \
-            README.md LICENSE-MIT LICENSE-APACHE
-          sha256sum ${{ matrix.asset_name }} > ${{ matrix.asset_name }}.sha256
+          stage=$(mktemp -d)
+          cp "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" "$stage/"
+          cp README.md LICENSE-MIT LICENSE-APACHE "$stage/"
+          tar -C "$stage" -czvf "${{ matrix.asset_name }}" \
+            "${{ matrix.artifact_name }}" README.md LICENSE-MIT LICENSE-APACHE
+          sha256sum "${{ matrix.asset_name }}" > "${{ matrix.asset_name }}.sha256"
 
       - name: Package archive (Windows)
         if: matrix.os == 'windows-latest'

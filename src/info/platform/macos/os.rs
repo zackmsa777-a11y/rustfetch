@@ -38,5 +38,9 @@ fn plist_string_value(plist: &str, key: &str) -> Option<String> {
     let rest = &after[start..];
     let end = rest.find("</string>")?;
     let val = rest[..end].trim();
-    if val.is_empty() { None } else { Some(val.to_string()) }
+    if val.is_empty() {
+        None
+    } else {
+        Some(val.to_string())
+    }
 }

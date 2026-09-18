@@ -286,7 +286,9 @@ pub fn print_help() {
     println!("    --logo-width <NUM>     Width in terminal cells for image logos");
     println!("    --logo-height <NUM>    Height in terminal cells for image logos");
     println!("    --no-logo              Hide the ASCII distro logo");
-    println!("    -f, --fast             Minimal sfetch-like profile (os/host/kernel/wm/terminal, builtin logo)");
+    println!(
+        "    -f, --fast             Minimal sfetch-like profile (os/host/kernel/wm/terminal, builtin logo)"
+    );
     println!("    --no-color             Disable ANSI terminal colors");
     println!("    --color <MODE>         Color output mode (always, auto, never)");
     println!("    --structure <LIST>     Colon or comma-separated list of modules to display");
