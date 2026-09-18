@@ -11,7 +11,7 @@
 
 rustPlatform.buildRustPackage rec {
   pname = "rustfetch";
-  version = "0.1.0";
+  version = "0.1.1";
 
   inherit src;
 

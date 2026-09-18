@@ -22,9 +22,9 @@ class Rustftechh < Formula
   head "https://github.com/zackmsa777-a11y/rustfetch.git", branch: "master"
 
   # REPLACE after release — preferred: GitHub release source archive
-  url "https://github.com/zackmsa777-a11y/rustfetch/archive/refs/tags/v0.1.0.tar.gz"
+  url "https://github.com/zackmsa777-a11y/rustfetch/archive/refs/tags/v0.1.1.tar.gz"
   sha256 "REPLACE_WITH_SHA256_OF_SOURCE_TARBALL"
-  version "0.1.0"
+  version "0.1.1"
 
   # Only needed when building from source (url above is a source archive).
   # Drop this dependency if you switch `url` to a prebuilt release binary tarball

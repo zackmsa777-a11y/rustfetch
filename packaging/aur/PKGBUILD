@@ -17,7 +17,7 @@
 
 _pkgname=rustfetch
 pkgname=rustftechh
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="Blazingly fast system information fetch tool written in Rust"
 arch=('x86_64' 'aarch64')
