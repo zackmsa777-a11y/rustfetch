@@ -175,6 +175,20 @@ yay -S rustftechh
 # or: paru -S rustftechh
 ```
 
+
+### Debian / Ubuntu / Mint (.deb)
+
+Package name **`rustftechh`** (matches crates.io); installs **`/usr/bin/rustfetch`**.
+Not in the Debian/Ubuntu archives yet — `.deb` files ship via
+[GitHub Releases](https://github.com/zackmsa777-a11y/rustfetch/releases)
+(or build with [`packaging/apt/build-deb.sh`](packaging/apt/build-deb.sh)).
+See [`packaging/apt/README.md`](packaging/apt/README.md).
+
+```bash
+sudo apt install ./rustftechh_*.deb
+rustfetch --version
+```
+
 ### Scoop (Windows)
 
 Bucket: [zackmsa777-a11y/scoop-rustftechh](https://github.com/zackmsa777-a11y/scoop-rustftechh).

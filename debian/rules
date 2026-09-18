@@ -1,0 +1,47 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE = 1
+# Prefer rustup/cargo from PATH (needed for edition 2024 / rust-version 1.88+)
+export CARGO_HOME ?= $(CURDIR)/debian/cargo_home
+export CARGO_TARGET_DIR ?= $(CURDIR)/target
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+	rm -rf $(CARGO_HOME)
+	# Keep vendor-style cleanliness; cargo clean is optional if no prior build
+	-cargo clean
+	dh_auto_clean
+
+override_dh_auto_configure:
+	# no-op: Cargo.toml is the build system
+
+override_dh_auto_build:
+	mkdir -p $(CARGO_HOME)
+	cargo build --release --locked
+
+override_dh_auto_test:
+	cargo test --release --locked || cargo test --locked
+
+override_dh_auto_install:
+	install -D -m 755 target/release/rustfetch \
+		debian/rustftechh/usr/bin/rustfetch
+	install -D -m 644 man/rustfetch.1 \
+		debian/rustftechh/usr/share/man/man1/rustfetch.1
+	install -D -m 644 completions/rustfetch.bash \
+		debian/rustftechh/usr/share/bash-completion/completions/rustfetch
+	install -D -m 644 completions/rustfetch.zsh \
+		debian/rustftechh/usr/share/zsh/vendor-completions/_rustfetch
+	install -D -m 644 completions/rustfetch.fish \
+		debian/rustftechh/usr/share/fish/vendor_completions.d/rustfetch.fish
+	install -D -m 644 LICENSE-MIT \
+		debian/rustftechh/usr/share/doc/rustftechh/LICENSE-MIT
+	install -D -m 644 LICENSE-APACHE \
+		debian/rustftechh/usr/share/doc/rustftechh/LICENSE-APACHE
+	install -D -m 644 README.md \
+		debian/rustftechh/usr/share/doc/rustftechh/README.md
+
+override_dh_dwz:
+	# Strip already applied via Cargo profile; skip dwz on Rust binaries
+	true

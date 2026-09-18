@@ -1,0 +1,47 @@
+# Copy to .github/workflows/deb.yml when the GitHub token has the `workflow` scope.
+name: Deb package
+
+on:
+  pull_request:
+    branches: [ master, main ]
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-deb:
+    name: Build .deb (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dpkg tools
+        run: sudo apt-get update && sudo apt-get install -y dpkg-dev
+
+      - name: Build .deb
+        run: ./packaging/apt/build-deb.sh
+
+      - name: Verify /usr/bin/rustfetch in package
+        run: dpkg-deb -c packaging/apt/out/rustftechh_*.deb | grep -E 'usr/bin/rustfetch'
+
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustftechh-deb
+          path: packaging/apt/out/*.deb
+
+      - name: Attach .deb to GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packaging/apt/out/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

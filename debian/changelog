@@ -1,0 +1,7 @@
+rustftechh (0.1.0-1) UNRELEASED; urgency=medium
+
+  * Initial Debian packaging for rustftechh (binary: rustfetch).
+  * Ships man page and bash/zsh/fish shell completions.
+  * Dual-licensed MIT OR Apache-2.0.
+
+ -- Zack <zackmsa777-a11y@users.noreply.github.com>  Fri, 18 Sep 2026 16:08:00 +0300

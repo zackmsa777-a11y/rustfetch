@@ -10,3 +10,6 @@ Thumbs.db
 /result
 /result-*
 
+
+# Local .deb build output
+/packaging/apt/out/
