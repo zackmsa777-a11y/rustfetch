@@ -1,5 +1,8 @@
-# Nix expression building rustfetch from the repository root.
+# Nix expression building rustfetch from a source tree (repo root / flake `self`).
 # Crate name on crates.io: rustftechh; binary: rustfetch.
+#
+# Prefer the root flake (`nix build .#rustfetch`). For a future nixpkgs PR see
+# `nixpkgs.nix` (fetchCrate) and copy to `pkgs/by-name/ru/rustfetch/package.nix`.
 {
   lib,
   rustPlatform,
@@ -12,7 +15,7 @@ rustPlatform.buildRustPackage rec {
 
   inherit src;
 
-  # Keep in sync with Cargo.lock at the repo root after dependency bumps.
+  # Prefer vendoring from the committed Cargo.lock at the repository root.
   cargoLock = {
     lockFile = "${src}/Cargo.lock";
   };
@@ -22,7 +25,11 @@ rustPlatform.buildRustPackage rec {
   meta = with lib; {
     description = "Blazingly fast system information fetch tool written in Rust";
     homepage = "https://github.com/zackmsa777-a11y/rustfetch";
-    license = with licenses; [ mit asl20 ];
+    changelog = "https://github.com/zackmsa777-a11y/rustfetch/blob/master/CHANGELOG.md";
+    license = with licenses; [
+      mit
+      asl20
+    ];
     mainProgram = "rustfetch";
     platforms = platforms.unix ++ platforms.windows;
   };

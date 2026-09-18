@@ -1,7 +1,8 @@
-# Convenience flake when working inside packaging/nix/.
-# Prefer the repository-root flake.nix for `nix run github:...`.
+# Root flake so `nix run github:zackmsa777-a11y/rustfetch` and
+# `nix profile install github:zackmsa777-a11y/rustfetch` work.
+# Crate on crates.io: rustftechh; installed binary / app: rustfetch.
 {
-  description = "rustfetch (packaging/nix convenience flake; crate: rustftechh)";
+  description = "rustfetch — blazingly fast system information fetch (crate: rustftechh)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -18,13 +19,12 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
-        # Repository root is two levels up from this flake.
-        repoRoot = ../..;
-        rustfetch = pkgs.callPackage ./default.nix { src = repoRoot; };
+        rustfetch = pkgs.callPackage ./packaging/nix/default.nix { src = self; };
       in
       {
         packages.default = rustfetch;
         packages.rustfetch = rustfetch;
+
         apps.default = {
           type = "app";
           program = "${rustfetch}/bin/rustfetch";
@@ -33,6 +33,7 @@
           type = "app";
           program = "${rustfetch}/bin/rustfetch";
         };
+
         devShells.default = pkgs.mkShell {
           packages = [
             pkgs.cargo
@@ -41,6 +42,13 @@
             pkgs.clippy
           ];
         };
+
+        formatter = pkgs.nixfmt-rfc-style;
       }
-    );
+    )
+    // {
+      overlays.default = final: _prev: {
+        rustfetch = final.callPackage ./packaging/nix/default.nix { src = self; };
+      };
+    };
 }
