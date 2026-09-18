@@ -1,3 +1,8 @@
+## [0.1.1] - 2026-09-18
+
+### Added
+- `--fast` / `-f` minimal sfetch-like profile (os/host/kernel/wm/terminal), ~30× faster than default
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
