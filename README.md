@@ -138,17 +138,15 @@ cp target/release/rustfetch ~/.cargo/bin/
 # or: cargo install --path . --locked
 ```
 
-### Homebrew (formula stub — not tapped yet)
+### Homebrew
 
-A formula template lives at [`packaging/homebrew/rustftechh.rb`](packaging/homebrew/rustftechh.rb)
-(`class Rustftechh`; installs the `rustfetch` binary). After the first tagged release,
-fill `url`/`sha256` and submit to a tap or homebrew-core:
+Tap: [zackmsa777-a11y/homebrew-rustftechh](https://github.com/zackmsa777-a11y/homebrew-rustftechh)
+(formula builds from source; installs the `rustfetch` binary).
 
 ```bash
-# When published to a tap:
+brew tap zackmsa777-a11y/rustftechh
 brew install rustftechh
-# or from this repo's stub (after filling checksums):
-# brew install --formula ./packaging/homebrew/rustftechh.rb
+rustfetch --version
 ```
 
 ### AUR (PKGBUILD stub — not uploaded yet)
@@ -164,10 +162,15 @@ yay -S rustftechh
 # or: paru -S rustftechh
 ```
 
-### Scoop (Windows stub)
+### Scoop (Windows)
 
-Manifest stub: [`packaging/scoop/rustftechh.json`](packaging/scoop/rustftechh.json)
-(`bin`: `rustfetch.exe`; fill hash after a Windows release asset exists).
+Bucket: [zackmsa777-a11y/scoop-rustftechh](https://github.com/zackmsa777-a11y/scoop-rustftechh).
+Until Windows release zips ship, prefer Cargo on Windows:
+
+```powershell
+scoop bucket add rustftechh https://github.com/zackmsa777-a11y/scoop-rustftechh
+cargo install rustftechh --locked
+```
 
 ### Shell Completions
 
