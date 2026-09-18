@@ -26,7 +26,7 @@ cargo install rustftechh --locked   # installs ~/.cargo/bin/rustfetch
 | `homebrew/rustftechh.rb` | Homebrew formula (`class Rustftechh`; installs `rustfetch`) |
 | `aur/PKGBUILD` + `aur/.SRCINFO` | Arch User Repository (`pkgname=rustftechh`, binary `/usr/bin/rustfetch`) |
 | `scoop/rustftechh.json` | Scoop bucket manifest (`bin`: `rustfetch.exe`) |
-| `nix/flake.nix` + `nix/default.nix` | Nix flake / package (`apps.rustfetch`) |
+| `../flake.nix` + `nix/default.nix` + `nix/nixpkgs.nix` | Root flake, source package, nixpkgs `fetchCrate` stub |
 
 ## Maintainer submit steps
 
@@ -53,12 +53,16 @@ cargo install rustftechh --locked   # installs ~/.cargo/bin/rustfetch
 
 ### Nix
 
+Root flake (preferred):
+
 ```bash
-cd packaging/nix
-nix build .#rustfetch
-nix run .#rustfetch -- --version
+nix run github:zackmsa777-a11y/rustfetch -- --version
+nix profile install github:zackmsa777-a11y/rustfetch
+nix build .#rustfetch   # from a checkout
 ```
 
-Or call `default.nix` from a NixOS module / overlay with `src` pointing at the repo root.
+`packaging/nix/default.nix` builds from source via `cargoLock.lockFile` → repo `Cargo.lock`.
+For a nixpkgs PR, copy `packaging/nix/nixpkgs.nix` to `pkgs/by-name/ru/rustfetch/package.nix`
+(see `packaging/nix/README.md`).
 
 Release binaries are produced by `.github/workflows/release.yml` on tags matching `v*`.

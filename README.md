@@ -149,6 +149,19 @@ brew install rustftechh
 rustfetch --version
 ```
 
+### Nix
+
+Flake (binary name **`rustfetch`**; crates.io crate **`rustftechh`**):
+
+```bash
+nix run github:zackmsa777-a11y/rustfetch -- --version
+nix profile install github:zackmsa777-a11y/rustfetch
+# or from crates.io once packaged in nixpkgs: nix-shell -p rustfetch
+```
+
+From a checkout: `nix build .#rustfetch` then `./result/bin/rustfetch --version`.
+Packaging notes and a nixpkgs `fetchCrate` stub live under [`packaging/nix/`](packaging/nix/).
+
 ### AUR (PKGBUILD stub — not uploaded yet)
 
 Arch packaging stubs: [`packaging/aur/PKGBUILD`](packaging/aur/PKGBUILD) and

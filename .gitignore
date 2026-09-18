@@ -5,3 +5,8 @@
 *~
 .DS_Store
 Thumbs.db
+
+# Nix build results
+/result
+/result-*
+
