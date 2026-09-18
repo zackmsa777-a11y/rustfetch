@@ -1,6 +1,8 @@
 use crate::utils::value;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::fs;
 
+#[cfg_attr(any(target_os = "macos", target_os = "windows"), allow(dead_code))]
 pub fn format_swap(input: &str) -> Option<String> {
     let total_str = value(input, "SwapTotal", ':')?;
     let free_str = value(input, "SwapFree", ':')?;
@@ -25,6 +27,17 @@ pub fn format_swap(input: &str) -> Option<String> {
     Some(format!("{used_gib:.2} GiB / {total_gib:.2} GiB ({pct}%)"))
 }
 
+#[cfg(target_os = "macos")]
+pub fn detect_swap() -> Option<String> {
+    crate::info::platform::macos::swap::detect_swap()
+}
+
+#[cfg(target_os = "windows")]
+pub fn detect_swap() -> Option<String> {
+    crate::info::platform::windows::swap::detect_swap()
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn detect_swap() -> Option<String> {
     let meminfo = fs::read_to_string("/proc/meminfo").unwrap_or_default();
     format_swap(&meminfo)

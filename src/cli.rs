@@ -16,6 +16,10 @@ pub struct CliOptions {
     pub disk_paths: Option<Vec<String>>,
     pub config_path: Option<PathBuf>,
     pub gen_config: bool,
+    pub import_fastfetch: bool,
+    pub import_fastfetch_path: Option<PathBuf>,
+    pub force: bool,
+    pub dry_run: bool,
     pub list_logos: bool,
     pub list_modules: bool,
     pub list_themes: bool,
@@ -24,6 +28,8 @@ pub struct CliOptions {
     pub preview_themes: bool,
     pub theme_picker: bool,
     pub json: bool,
+    pub show_empty: bool,
+    pub completions: Option<String>,
     pub help: bool,
     pub version: bool,
 }
@@ -37,7 +43,25 @@ pub fn parse_cli(args: &[String]) -> Result<CliOptions, String> {
             "--no-color" => opts.no_color = true,
             "--no-logo" => opts.no_logo = true,
             "--json" => opts.json = true,
+            "--show-empty" => opts.show_empty = true,
+            "--completions" => {
+                if let Some(val) = iter.next() {
+                    opts.completions = Some(val.clone());
+                } else {
+                    return Err("--completions requires a shell name (bash|zsh|fish)".into());
+                }
+            }
             "--gen-config" => opts.gen_config = true,
+            "--import-fastfetch" => {
+                opts.import_fastfetch = true;
+                if let Some(peek) = iter.peek()
+                    && !peek.starts_with('-')
+                {
+                    opts.import_fastfetch_path = Some(PathBuf::from(iter.next().unwrap()));
+                }
+            }
+            "--force" => opts.force = true,
+            "--dry-run" => opts.dry_run = true,
             "--list-logos" => opts.list_logos = true,
             "--list-modules" => opts.list_modules = true,
             "--list-themes" => opts.list_themes = true,
@@ -109,11 +133,27 @@ pub fn parse_cli(args: &[String]) -> Result<CliOptions, String> {
                     return Err("--kitty-icat requires an image file path".into());
                 }
             }
+            "--sixel" => {
+                if let Some(val) = iter.next() {
+                    opts.logo = Some(val.clone());
+                    opts.logo_type = Some("sixel".into());
+                } else {
+                    return Err("--sixel requires an image file path".into());
+                }
+            }
+            "--iterm" => {
+                if let Some(val) = iter.next() {
+                    opts.logo = Some(val.clone());
+                    opts.logo_type = Some("iterm".into());
+                } else {
+                    return Err("--iterm requires an image file path".into());
+                }
+            }
             "--logo-type" => {
                 if let Some(val) = iter.next() {
                     opts.logo_type = Some(val.to_lowercase());
                 } else {
-                    return Err("--logo-type requires a type name (kitty|kitty-direct|kitty-icat|file|builtin|auto)".into());
+                    return Err("--logo-type requires a type name (kitty|kitty-direct|kitty-icat|sixel|iterm|file|builtin|auto)".into());
                 }
             }
             "--logo-width" => {
@@ -232,11 +272,13 @@ pub fn print_help() {
     println!("    --logo <NAME>          Specify a custom distro or OS logo");
     println!("    --logo-color <COLOR>   Override the logo primary ANSI color");
     println!(
-        "    --logo-type <TYPE>     Logo type: kitty, kitty-direct, kitty-icat, file, builtin, auto"
+        "    --logo-type <TYPE>     Logo type: kitty, kitty-direct, kitty-icat, sixel, iterm, file, builtin, auto"
     );
     println!("    --kitty <PATH>         Display an image logo using the Kitty graphics protocol");
     println!("    --kitty-direct <PATH>  Display an image using direct Kitty file transfer");
     println!("    --kitty-icat <PATH>    Display an image via kitten icat tool");
+    println!("    --sixel <PATH>         Display an image logo using the Sixel protocol");
+    println!("    --iterm <PATH>         Display an image logo using iTerm2 inline images");
     println!("    --logo-width <NUM>     Width in terminal cells for image logos");
     println!("    --logo-height <NUM>    Height in terminal cells for image logos");
     println!("    --no-logo              Hide the ASCII distro logo");
@@ -248,6 +290,11 @@ pub fn print_help() {
     );
     println!("    --config <PATH>        Path to custom JSON/JSONC configuration file");
     println!("    --gen-config           Print default JSON configuration to stdout");
+    println!("    --import-fastfetch [PATH]  Import a fastfetch JSON/JSONC config into rustfetch");
+    println!("                           Default search: ~/.config/fastfetch/config.jsonc|.json");
+    println!("                           Writes to ~/.config/rustfetch/config.jsonc (or --config)");
+    println!("    --force                Overwrite an existing rustfetch config when importing");
+    println!("    --dry-run              Print the mapped config to stdout without writing");
     println!("    --list-logos           List all supported distro and OS logos");
     println!("    --list-modules         List all available information modules");
     println!("    --list-themes          List all available color themes and layouts");
@@ -256,6 +303,8 @@ pub fn print_help() {
     println!("    --preview-themes       Print a live preview of every theme");
     println!("    --setup, --themes      Interactive full-screen theme & layout setup TUI");
     println!("    --json                 Output system information in structured JSON format");
+    println!("    --show-empty           Show info modules even when their value is empty");
+    println!("    --completions <SHELL>  Print shell completion script (bash, zsh, fish)");
     println!("    -v, --version          Print version information");
     println!("    -h, --help             Print help information\n");
     println!("EXAMPLES:");
@@ -265,7 +314,11 @@ pub fn print_help() {
     println!("    rustfetch --logo arch");
     println!("    rustfetch --no-logo");
     println!("    rustfetch --structure title:os:kernel:cpu:gpu:memory:colors");
+    println!("    rustfetch --import-fastfetch");
+    println!("    rustfetch --import-fastfetch ~/.config/fastfetch/config.jsonc --dry-run");
     println!("    rustfetch --json");
+    println!("    rustfetch --show-empty");
+    println!("    # custom modules: see --list-modules (command / custom)");
 }
 
 pub fn print_modules() {
@@ -300,6 +353,20 @@ pub fn print_modules() {
     println!("  - audio          (audio server and sound devices)");
     println!("  - local_ip       (primary network interface and IP address)");
     println!("  - locale         (system language and encoding)");
+    println!("  - command        (run a shell/command and show stdout; key + command/text)");
+    println!("  - custom         (static line: key+text, or format-only decorative text)");
     println!("  - break          (blank newline separator)");
     println!("  - colors         (8 standard and 8 bright ANSI color palette blocks)");
+    println!();
+    println!("Command / custom examples (config.jsonc):");
+    println!(
+        "  {{ \"type\": \"command\", \"key\": \"Weather\", \"command\": \"curl -s wttr.in/?format=3\" }}"
+    );
+    println!(
+        "  {{ \"type\": \"command\", \"key\": \"Editor\", \"text\": \"$EDITOR --version\", \"shell\": true }}"
+    );
+    println!("  {{ \"type\": \"custom\", \"key\": \"Git\", \"text\": \"zackmsa777-a11y\" }}");
+    println!(
+        "  Defaults: timeout 1500ms; failures/timeouts hide (respect showEmpty); shell=false."
+    );
 }

@@ -1,0 +1,26 @@
+{
+  "version": "0.1.0",
+  "description": "Blazingly fast system information fetch tool written in Rust",
+  "homepage": "https://github.com/zackmsa777-a11y/rustfetch",
+  "license": "MIT OR Apache-2.0",
+  "notes": [
+    "Stub manifest — fill url/hash after a GitHub release with Windows assets.",
+    "Package/registry name: rustftechh; installed command: rustfetch.exe",
+    "Expected asset: rustfetch-v0.1.0-x86_64-pc-windows-msvc.zip"
+  ],
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/zackmsa777-a11y/rustfetch/releases/download/v0.1.0/rustfetch-v0.1.0-x86_64-pc-windows-msvc.zip",
+      "hash": "REPLACE_WITH_SHA256_OF_WINDOWS_ZIP"
+    }
+  },
+  "bin": "rustfetch.exe",
+  "checkver": "github",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/zackmsa777-a11y/rustfetch/releases/download/v$version/rustfetch-v$version-x86_64-pc-windows-msvc.zip"
+      }
+    }
+  }
+}

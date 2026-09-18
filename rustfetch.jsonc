@@ -10,7 +10,8 @@
     "separator": ": ",
     "color": {
       "keys": "auto"
-    }
+    },
+    "showEmpty": false
   },
   "modules": [
     "title",

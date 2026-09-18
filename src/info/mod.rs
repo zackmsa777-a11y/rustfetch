@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod battery;
+pub mod command;
 pub mod cpu;
 pub mod de_wm;
 pub mod disk;
@@ -11,6 +12,7 @@ pub mod locale;
 pub mod memory;
 pub mod network;
 pub mod os;
+pub mod platform;
 pub mod packages;
 pub mod shell;
 pub mod swap;
@@ -18,26 +20,12 @@ pub mod terminal;
 pub mod types;
 pub mod uptime;
 
-use crate::utils::clean;
-use std::env;
-use std::fs;
 use std::thread;
 use types::SystemInfo;
 
 pub fn gather_info(custom_disks: Option<&[String]>) -> SystemInfo {
-    let user = clean(
-        &env::var("USER")
-            .or_else(|_| env::var("LOGNAME"))
-            .unwrap_or_else(|_| "user".into()),
-    );
-
-    let hostname = clean(
-        fs::read_to_string("/etc/hostname")
-            .or_else(|_| fs::read_to_string("/proc/sys/kernel/hostname"))
-            .or_else(|_| env::var("HOSTNAME"))
-            .unwrap_or_else(|_| "localhost".into())
-            .trim(),
-    );
+    let user = platform::detect_user();
+    let hostname = platform::detect_hostname();
 
     let (os_val, distro_id, distro_name) = os::detect_os();
     let kernel_val = kernel::detect_kernel();

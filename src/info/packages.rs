@@ -1,8 +1,23 @@
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::env;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::fs;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::path::Path;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::process::Command;
 
+#[cfg(target_os = "macos")]
+pub fn detect_packages() -> Option<String> {
+    crate::info::platform::macos::packages::detect_packages()
+}
+
+#[cfg(target_os = "windows")]
+pub fn detect_packages() -> Option<String> {
+    None
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn detect_packages() -> Option<String> {
     let mut counts = Vec::new();
 

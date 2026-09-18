@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- crates.io package renamed to **`rustftechh`** (binary remains `rustfetch` via `[[bin]]`). docs.rs URL → `docs.rs/rustftechh`. Packaging stubs updated (Homebrew `rustftechh.rb`, AUR `pkgname=rustftechh`, Scoop `rustftechh.json`, Nix flake). Install: `cargo install rustftechh --locked`.
+
+### Added
+- macOS (Darwin) and Windows info backends behind `src/info/platform/` (`sysctl`/IOKit-friendly Darwin probes; light Win32 FFI without `windows-sys`). Linux behavior unchanged. Cross-check helper at `scripts/check-cross.sh`; README platform support matrix.
+- Custom / script modules: `command` (run a process with timeout; stdout as value) and keyed `custom`/`static` text lines. Defaults to a 1.5s timeout, no shell unless `shell: true`, and hide on failure (respects `showEmpty` / `showFailure`). Fastfetch `command` modules map on `--import-fastfetch`.
+- Shell completions for bash, zsh, and fish via `rustfetch --completions <shell>`, with checked-in scripts under `completions/`.
+- Manual page at `man/rustfetch.1` covering synopsis, key options, config paths, and import/show-empty examples.
+- Publish & install polish: Cargo.toml `exclude` metadata, polished `install.sh` (OS/arch detection, GitHub release binaries for `zackmsa777-a11y/rustfetch`, cargo fallback), packaging stubs (Homebrew / AUR / Scoop), Makefile install targets, and release archive packaging fix.
+- Sixel and iTerm2 image logo protocols alongside Kitty (`--sixel`, `--iterm`, `--logo-type sixel|iterm|auto`), with terminal auto-detection and ASCII fallback.
+
 ## [0.1.0] - 2026-09-17
 
 ### Added

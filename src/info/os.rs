@@ -1,9 +1,25 @@
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use crate::utils::{clean, value};
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::env;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::ffi::CStr;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::fs;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 use std::path::Path;
 
+#[cfg(target_os = "macos")]
+pub fn detect_os() -> (Option<String>, String, String) {
+    crate::info::platform::macos::os::detect_os()
+}
+
+#[cfg(target_os = "windows")]
+pub fn detect_os() -> (Option<String>, String, String) {
+    crate::info::platform::windows::os::detect_os()
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn detect_os() -> (Option<String>, String, String) {
     let bedrock_restricted = env::var("BEDROCK_RESTRICT")
         .map(|v| v == "1")

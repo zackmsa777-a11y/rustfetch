@@ -24,6 +24,9 @@ pub struct RenderStyle {
     pub separator: Option<String>,
     /// Explicit layout. `None` renders the default module order.
     pub modules: Option<Vec<ModuleSpec>>,
+    /// When true, print info modules even if their value is empty.
+    /// Default false: skip empty/None/whitespace-only info values.
+    pub show_empty: bool,
 }
 
 /// Translate a theme definition into a render style; CLI flags are layered on
@@ -78,6 +81,7 @@ pub struct PrintOptions<'a> {
     pub separator: Option<&'a str>,
     pub structure: Option<&'a [String]>,
     pub json: bool,
+    pub show_empty: bool,
 }
 
 /// Modules rendered when neither the theme nor the config supplies a layout.
@@ -152,8 +156,50 @@ pub fn default_key(kind: &str) -> &'static str {
         "audio" => "Audio",
         "local_ip" => "Local IP",
         "locale" => "Locale",
+        "command" => "Command",
+        "custom" => "Custom",
         _ => "",
     }
+}
+
+/// True for structural layout modules that are not keyed info values.
+#[allow(dead_code)]
+pub fn is_structural_module(kind: &str) -> bool {
+    matches!(kind, "title" | "separator" | "break" | "colors" | "custom")
+}
+
+/// True for modules that resolve a system info value (may be empty).
+pub fn is_info_module(kind: &str) -> bool {
+    matches!(
+        kind,
+        "os" | "host"
+            | "kernel"
+            | "uptime"
+            | "packages"
+            | "shell"
+            | "display"
+            | "de"
+            | "wm"
+            | "wm_theme"
+            | "theme"
+            | "icons"
+            | "font"
+            | "cursor"
+            | "terminal"
+            | "terminal_font"
+            | "cpu"
+            | "gpu"
+            | "memory"
+            | "swap"
+            | "disk"
+            | "battery"
+            | "power_adapter"
+            | "audio"
+            | "local_ip"
+            | "public_ip"
+            | "locale"
+            | "command"
+    )
 }
 
 /// Value of a module, or `None` when the module has nothing to show.
@@ -291,6 +337,81 @@ fn colorize_logo(art: &LogoArt, no_color: bool, override_color: Option<&str>) ->
         .collect()
 }
 
+fn resolve_dynamic_values(modules: &[ModuleSpec]) -> Vec<Option<String>> {
+    let mut out: Vec<Option<String>> = modules
+        .iter()
+        .map(|spec| {
+            if spec.kind == "custom" && spec.key.is_some() {
+                spec.text
+                    .clone()
+                    .or_else(|| spec.format.clone())
+                    .filter(|s| !s.is_empty())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    std::thread::scope(|s| {
+        let mut handles = Vec::new();
+        for (i, spec) in modules.iter().enumerate() {
+            if spec.kind != "command" {
+                continue;
+            }
+            let cmdline = spec.command.clone().or_else(|| spec.text.clone());
+            let shell = spec.shell;
+            let timeout_ms = spec.timeout_ms;
+            let show_failure = spec.show_failure;
+            handles.push((
+                i,
+                s.spawn(move || {
+                    crate::info::command::run_module_command(
+                        cmdline.as_deref(),
+                        shell,
+                        timeout_ms,
+                        show_failure,
+                    )
+                }),
+            ));
+        }
+        for (i, handle) in handles {
+            out[i] = handle.join().ok().flatten();
+        }
+    });
+
+    out
+}
+
+#[allow(clippy::too_many_arguments)]
+fn push_keyed_line(
+    lines: &mut Vec<String>,
+    spec: &ModuleSpec,
+    kind: &str,
+    value: &str,
+    key_col: &str,
+    val_prefix: &str,
+    value_col: &str,
+    reset: &str,
+) {
+    let mut key = spec
+        .key
+        .clone()
+        .unwrap_or_else(|| default_key(kind).to_string());
+    if key.is_empty() && (kind == "command" || kind == "custom") {
+        key = "Command".to_string();
+    }
+    if let Some(width) = spec.key_width {
+        let pad = width.saturating_sub(key.chars().count());
+        key.push_str(&" ".repeat(pad));
+    }
+    let val = match spec.format.as_deref() {
+        Some(tmpl) if tmpl.contains("{}") || tmpl.contains("{1}") => apply_format(tmpl, value),
+        Some(_) => value.to_string(),
+        None => value.to_string(),
+    };
+    lines.push(format!("{key_col}{key}{val_prefix}{value_col}{val}{reset}"));
+}
+
 /// Render the module column (no logo) exactly as it will appear.
 pub fn format_styled_module_lines(info: &SystemInfo, style: &RenderStyle) -> Vec<String> {
     let no_color = style.no_color;
@@ -324,7 +445,8 @@ pub fn format_styled_module_lines(info: &SystemInfo, style: &RenderStyle) -> Vec
     let title_plain = format!("{}@{}", info.user, info.hostname);
 
     let mut lines = Vec::new();
-    for spec in &modules {
+    let dynamic = resolve_dynamic_values(&modules);
+    for (idx, spec) in modules.iter().enumerate() {
         let kind = spec.kind.as_str();
 
         if kind == "break" {
@@ -363,11 +485,64 @@ pub fn format_styled_module_lines(info: &SystemInfo, style: &RenderStyle) -> Vec
                 }
             }
             "custom" => {
-                let text = spec.format.clone().unwrap_or_default();
-                if !text.is_empty() {
-                    lines.push(text);
+                if spec.key.is_some() {
+                    match &dynamic[idx] {
+                        Some(val) => push_keyed_line(
+                            &mut lines,
+                            spec,
+                            kind,
+                            val,
+                            key_col,
+                            &val_prefix,
+                            &value_col,
+                            reset,
+                        ),
+                        None if style.show_empty => push_keyed_line(
+                            &mut lines,
+                            spec,
+                            kind,
+                            "",
+                            key_col,
+                            &val_prefix,
+                            &value_col,
+                            reset,
+                        ),
+                        None => {}
+                    }
+                } else {
+                    let text = spec
+                        .format
+                        .clone()
+                        .or_else(|| spec.text.clone())
+                        .unwrap_or_default();
+                    if !text.is_empty() {
+                        lines.push(text);
+                    }
                 }
             }
+            "command" => match &dynamic[idx] {
+                Some(val) => push_keyed_line(
+                    &mut lines,
+                    spec,
+                    kind,
+                    val,
+                    key_col,
+                    &val_prefix,
+                    &value_col,
+                    reset,
+                ),
+                None if style.show_empty => push_keyed_line(
+                    &mut lines,
+                    spec,
+                    kind,
+                    "",
+                    key_col,
+                    &val_prefix,
+                    &value_col,
+                    reset,
+                ),
+                None => {}
+            },
             "disk" => {
                 if let Some(ref disks) = info.disk {
                     for d in disks {
@@ -390,12 +565,35 @@ pub fn format_styled_module_lines(info: &SystemInfo, style: &RenderStyle) -> Vec
                         };
                         lines.push(format!("{key_col}{key}{val_prefix}{value_col}{val}{reset}"));
                     }
+                } else if style.show_empty {
+                    let mut key = spec
+                        .key
+                        .clone()
+                        .unwrap_or_else(|| default_key("disk").to_string());
+                    if let Some(width) = spec.key_width {
+                        let pad = width.saturating_sub(key.chars().count());
+                        key.push_str(&" ".repeat(pad));
+                    }
+                    lines.push(format!("{key_col}{key}{val_prefix}{value_col}{reset}"));
                 }
             }
             _ => {
                 let Some(val) = module_value(info, kind) else {
-                    // If it's a bare string like "[ system ]" that isn't a known module,
-                    // treat it as custom text.
+                    if is_info_module(kind) {
+                        if style.show_empty {
+                            let mut key = spec
+                                .key
+                                .clone()
+                                .unwrap_or_else(|| default_key(kind).to_string());
+                            if let Some(width) = spec.key_width {
+                                let pad = width.saturating_sub(key.chars().count());
+                                key.push_str(&" ".repeat(pad));
+                            }
+                            lines.push(format!("{key_col}{key}{val_prefix}{value_col}{reset}"));
+                        }
+                        continue;
+                    }
+                    // Unknown kind: treat as custom text / section label.
                     if let Some(ref fmt) = spec.format {
                         lines.push(fmt.clone());
                     } else if spec.key.is_none() && !kind.is_empty() {
@@ -488,41 +686,44 @@ pub fn render_lines(info: &SystemInfo, style: &RenderStyle) -> Vec<String> {
         return module_lines;
     }
 
-    // Check if this should be rendered using Kitty Graphics Protocol (Image)
-    let is_kitty_requested = matches!(
-        style.logo_type.as_deref(),
-        Some("kitty") | Some("kitty-direct") | Some("kitty-icat")
-    );
     let logo_str = style.logo.as_deref().unwrap_or("");
     let is_img = crate::kitty::is_image_path(logo_str);
-    let terminal_is_kitty = crate::kitty::supports_kitty_graphics();
+    let explicit_image = matches!(
+        style.logo_type.as_deref(),
+        Some("kitty")
+            | Some("kitty-direct")
+            | Some("kitty-icat")
+            | Some("sixel")
+            | Some("iterm")
+            | Some("iterm2")
+    );
+    let auto_or_unset = matches!(style.logo_type.as_deref(), None | Some("auto"));
+    let protocol = if explicit_image {
+        crate::kitty::resolve_logo_protocol(style.logo_type.as_deref())
+    } else if is_img && auto_or_unset {
+        crate::kitty::detect_image_protocol()
+    } else {
+        None
+    };
 
-    let maybe_img = if !style.no_color
-        && (is_kitty_requested
-            || (is_img
-                && (terminal_is_kitty
-                    || style.logo_type.is_none()
-                    || style.logo_type.as_deref() == Some("auto"))))
-    {
+    let maybe_img = if !style.no_color && protocol.is_some() && (explicit_image || is_img) {
         crate::kitty::resolve_image_path(logo_str)
     } else {
         None
     };
 
-    if let Some(img_path) = maybe_img {
-        let direct = style.logo_type.as_deref() == Some("kitty-direct");
-        let icat = style.logo_type.as_deref() == Some("kitty-icat");
-        let kitty_opts = crate::kitty::KittyImageOptions {
+    if let (Some(img_path), Some(proto)) = (maybe_img, protocol) {
+        let img_opts = crate::kitty::KittyImageOptions {
             req_w: style.logo_width,
             req_h: style.logo_height,
             padding_top: style.padding_top,
             padding_left: style.padding_left,
             padding_right: style.padding_right,
-            direct,
-            icat,
+            direct: proto == "kitty-direct",
+            icat: proto == "kitty-icat",
         };
         if let Ok(lines) =
-            crate::kitty::render_kitty_image_lines(&img_path, &kitty_opts, &module_lines)
+            crate::kitty::render_image_logo_lines(&img_path, proto, &img_opts, &module_lines)
         {
             return lines;
         }
@@ -587,6 +788,7 @@ pub fn print_fetch(info: &SystemInfo, opts: &PrintOptions) {
         title_color: opts.title_color.map(|s| s.to_string()),
         value_color: opts.value_color.map(|s| s.to_string()),
         separator: opts.separator.map(|s| s.to_string()),
+        show_empty: opts.show_empty,
         modules: opts.structure.map(|s| {
             s.iter()
                 .map(|name| ModuleSpec {
@@ -599,4 +801,223 @@ pub fn print_fetch(info: &SystemInfo, opts: &PrintOptions) {
     };
 
     print_fetch_styled(info, &style);
+}
+
+#[cfg(test)]
+mod show_empty_tests {
+    use super::*;
+    use crate::info::types::SystemInfo;
+
+    fn sample_info() -> SystemInfo {
+        SystemInfo {
+            user: "user".into(),
+            hostname: "host".into(),
+            os: Some("TestOS 1.0".into()),
+            shell: None,
+            de: Some("   ".into()),
+            gpu: None,
+            ..Default::default()
+        }
+    }
+
+    fn style_with(modules: &[&str], show_empty: bool) -> RenderStyle {
+        RenderStyle {
+            no_color: true,
+            no_logo: true,
+            show_empty,
+            modules: Some(
+                modules
+                    .iter()
+                    .map(|k| ModuleSpec {
+                        kind: (*k).to_string(),
+                        ..Default::default()
+                    })
+                    .collect(),
+            ),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn skips_empty_info_modules_by_default() {
+        let info = sample_info();
+        let style = style_with(
+            &[
+                "title",
+                "separator",
+                "os",
+                "shell",
+                "de",
+                "gpu",
+                "break",
+                "colors",
+            ],
+            false,
+        );
+        let lines = format_styled_module_lines(&info, &style);
+        // title + separator + os + break (colors skipped under no_color)
+        assert!(
+            lines.iter().any(|l| l.contains("OS")),
+            "expected OS line: {lines:?}"
+        );
+        assert!(
+            !lines.iter().any(|l| l == "shell" || l.starts_with("Shell")),
+            "shell must be hidden: {lines:?}"
+        );
+        assert!(
+            !lines.iter().any(|l| l == "de" || l.starts_with("DE")),
+            "whitespace-only DE must be hidden: {lines:?}"
+        );
+        assert!(
+            !lines.iter().any(|l| l == "gpu" || l.starts_with("GPU")),
+            "gpu must be hidden: {lines:?}"
+        );
+        assert_eq!(lines[0], "user@host");
+        assert_eq!(lines[1], "-".repeat("user@host".len()));
+        assert!(
+            lines.iter().any(|l| l.is_empty()),
+            "break must remain: {lines:?}"
+        );
+    }
+
+    #[test]
+    fn show_empty_prints_blank_info_keys() {
+        let info = sample_info();
+        let style = style_with(&["os", "shell", "de", "gpu"], true);
+        let lines = format_styled_module_lines(&info, &style);
+        assert_eq!(lines.len(), 4, "{lines:?}");
+        assert!(lines[0].starts_with("OS:"));
+        assert!(lines[0].contains("TestOS"));
+        assert_eq!(lines[1], "Shell: ");
+        assert_eq!(lines[2], "DE: ");
+        assert_eq!(lines[3], "GPU: ");
+    }
+
+    #[test]
+    fn structural_modules_not_dropped() {
+        let info = sample_info();
+        let style = RenderStyle {
+            no_color: false,
+            no_logo: true,
+            show_empty: false,
+            modules: Some(
+                ["title", "separator", "shell", "break", "colors"]
+                    .iter()
+                    .map(|k| ModuleSpec {
+                        kind: (*k).to_string(),
+                        ..Default::default()
+                    })
+                    .collect(),
+            ),
+            ..Default::default()
+        };
+        let lines = format_styled_module_lines(&info, &style);
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.contains("user") && l.contains("host"))
+        );
+        assert!(lines.iter().any(|l| l.chars().all(|c| c == '-')));
+        assert!(lines.iter().any(|l| l.is_empty()), "break kept: {lines:?}");
+        assert!(
+            lines.iter().any(|l| l.contains("[40m")),
+            "colors kept: {lines:?}"
+        );
+        assert!(
+            !lines.iter().any(|l| l == "shell" || l.contains("Shell")),
+            "empty shell hidden: {lines:?}"
+        );
+    }
+
+    #[test]
+    fn command_module_renders_echo() {
+        let info = sample_info();
+        let style = RenderStyle {
+            no_color: true,
+            no_logo: true,
+            show_empty: false,
+            modules: Some(vec![
+                ModuleSpec {
+                    kind: "os".into(),
+                    ..Default::default()
+                },
+                ModuleSpec {
+                    kind: "command".into(),
+                    key: Some("Echo".into()),
+                    command: Some("echo hello".into()),
+                    ..Default::default()
+                },
+                ModuleSpec {
+                    kind: "custom".into(),
+                    key: Some("Git".into()),
+                    text: Some("zackmsa777-a11y".into()),
+                    ..Default::default()
+                },
+            ]),
+            ..Default::default()
+        };
+        let lines = format_styled_module_lines(&info, &style);
+        assert!(lines.iter().any(|l| l == "Echo: hello"), "{lines:?}");
+        assert!(
+            lines.iter().any(|l| l == "Git: zackmsa777-a11y"),
+            "{lines:?}"
+        );
+    }
+
+    #[test]
+    fn command_failure_hides_when_empty() {
+        let info = sample_info();
+        let style = RenderStyle {
+            no_color: true,
+            no_logo: true,
+            show_empty: false,
+            modules: Some(vec![ModuleSpec {
+                kind: "command".into(),
+                key: Some("Fail".into()),
+                command: Some("false".into()),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+        let lines = format_styled_module_lines(&info, &style);
+        assert!(lines.is_empty(), "{lines:?}");
+    }
+
+    #[test]
+    fn command_timeout_hides_when_empty() {
+        let info = sample_info();
+        let style = RenderStyle {
+            no_color: true,
+            no_logo: true,
+            show_empty: false,
+            modules: Some(vec![ModuleSpec {
+                kind: "command".into(),
+                key: Some("Slow".into()),
+                command: Some("sleep 5".into()),
+                timeout_ms: 100,
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+        let lines = format_styled_module_lines(&info, &style);
+        assert!(lines.is_empty(), "{lines:?}");
+    }
+
+    #[test]
+    fn legacy_custom_format_still_structural() {
+        let info = sample_info();
+        let style = RenderStyle {
+            no_color: true,
+            no_logo: true,
+            show_empty: false,
+            modules: Some(vec![ModuleSpec {
+                kind: "custom".into(),
+                format: Some("~~~ section ~~~".into()),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+        let lines = format_styled_module_lines(&info, &style);
+        assert_eq!(lines, vec!["~~~ section ~~~".to_string()]);
+    }
 }

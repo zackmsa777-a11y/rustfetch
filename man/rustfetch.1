@@ -1,0 +1,270 @@
+.TH RUSTFETCH 1 "September 2026" "rustfetch 0.1.0" "User Commands"
+.SH NAME
+rustfetch \- blazingly fast system information fetch tool
+.SH SYNOPSIS
+.B rustfetch
+[\fIOPTIONS\fR]
+.SH DESCRIPTION
+.B rustfetch
+prints system information (OS, kernel, hardware, desktop environment, and more)
+alongside an ASCII or image logo. It aims for fastfetch parity with a pure-Rust
+implementation, JSON/JSONC configuration, themes, and an interactive setup TUI.
+.PP
+By default, empty info modules are hidden in human-readable output (useful on
+containers and VMs). Use
+.B \-\-show\-empty
+or set
+.B display.showEmpty
+in the config to show blank keys.
+.B \-\-json
+always includes null/empty fields.
+.SH OPTIONS
+.TP
+.B \-\-setup, \-\-themes, \-\-theme\-picker, \-\-tui
+Launch the interactive full-screen theme and layout setup TUI.
+.TP
+.BI \-\-theme " NAME"
+Use a theme once without saving it to the config file.
+.TP
+.BI \-\-set\-theme " NAME"
+Save a theme as the default in the config file.
+.TP
+.B \-\-list\-themes
+List available color themes and layouts.
+.TP
+.B \-\-preview\-themes
+Print a live preview of every theme.
+.TP
+.BI \-\-logo " NAME"
+Specify a custom distro or OS logo.
+.TP
+.BI \-\-logo\-color " COLOR"
+Override the logo primary ANSI color.
+.TP
+.BI \-\-logo\-type " TYPE"
+Logo type:
+.BR kitty ,
+.BR kitty\-direct ,
+.BR kitty\-icat ,
+.BR sixel ,
+.BR iterm ,
+.BR file ,
+.BR builtin ,
+or
+.BR auto
+(auto probes
+.BR TERM ,
+.BR TERM_PROGRAM ,
+.BR KITTY_WINDOW_ID ,
+.BR ITERM_SESSION_ID ,
+and related env vars).
+.TP
+.BI \-\-kitty " PATH"
+Display an image logo using the Kitty graphics protocol.
+.TP
+.BI \-\-kitty\-direct " PATH"
+Display an image using direct Kitty file transfer.
+.TP
+.BI \-\-kitty\-icat " PATH"
+Display an image via
+.BR kitten\ icat .
+.TP
+.BI \-\-sixel " PATH"
+Display an image logo using the Sixel graphics protocol (PNG/JPEG; WezTerm, foot, Windows Terminal where supported, and other sixel terminals).
+.TP
+.BI \-\-iterm " PATH"
+Display an image logo using the iTerm2 inline image protocol (OSC 1337).
+.TP
+.BI \-\-logo\-width " NUM"
+Width in terminal cells for image logos.
+.TP
+.BI \-\-logo\-height " NUM"
+Height in terminal cells for image logos.
+.TP
+.BI \-\-logo\-padding " NUM"
+Horizontal padding between logo and module lines.
+.TP
+.B \-\-no\-logo
+Hide the ASCII distro logo.
+.TP
+.B \-\-no\-color
+Disable ANSI terminal colors.
+.TP
+.BI \-\-color " MODE"
+Color output mode:
+.BR always ,
+.BR auto ,
+or
+.BR never .
+.TP
+.BI \-\-structure " LIST"
+Colon- or comma-separated list of modules to display
+(for example
+.BR title:os:kernel:cpu:memory:colors ).
+.TP
+.BI \-\-disk\-paths " PATHS"
+Comma-separated mount paths to check (default:
+.BR / ).
+.TP
+.BI \-\-config " PATH"
+Path to a custom JSON/JSONC configuration file.
+.TP
+.B \-\-gen\-config
+Print the default JSON configuration to stdout.
+.TP
+.BI \-\-import\-fastfetch " [PATH]"
+Import a fastfetch JSON/JSONC config into rustfetch.
+If
+.I PATH
+is omitted, searches
+.B ~/.config/fastfetch/config.jsonc
+and
+.BR ~/.config/fastfetch/config.json .
+Writes to
+.B ~/.config/rustfetch/config.jsonc
+(or
+.BR \-\-config ).
+.TP
+.B \-\-force
+Overwrite an existing rustfetch config when importing.
+.TP
+.B \-\-dry\-run
+Print the mapped import to stdout without writing a file.
+.TP
+.B \-\-list\-logos
+List all supported distro and OS logos.
+.TP
+.B \-\-list\-modules
+List all available information modules.
+.TP
+.B \-\-json
+Output system information in structured JSON format.
+.TP
+.B \-\-show\-empty
+Show info modules even when their value is empty.
+.TP
+.BI \-\-completions " SHELL"
+Print a shell completion script to stdout.
+.I SHELL
+must be
+.BR bash ,
+.BR zsh ,
+or
+.BR fish .
+.TP
+.B \-v, \-\-version
+Print version information.
+.TP
+.B \-h, \-\-help
+Print help information.
+.SH MODULES
+Common modules include
+.BR title ,
+.BR os ,
+.BR kernel ,
+.BR cpu ,
+.BR memory ,
+and
+.BR colors .
+Run
+.B rustfetch \-\-list\-modules
+for the full catalog.
+.PP
+Scriptable modules:
+.TP
+.B command
+Run a process and use trimmed stdout as the value. Config keys:
+.BR key ,
+.BR command
+(or fastfetch\-style
+.BR text ),
+optional
+.BR shell
+(boolean),
+.BR timeout
+(milliseconds, default 1500),
+and
+.BR showFailure .
+Failures and timeouts produce an empty value (hidden unless
+.B \-\-show\-empty
+or
+.B showFailure ).
+.TP
+.B custom
+Static text. With
+.B key
+and
+.B text ,
+prints a keyed info line. With only
+.B format ,
+prints a decorative structural line.
+.PP
+.SH FILES
+.TP
+.B ~/.config/rustfetch/config.jsonc
+Default configuration file (JSON with comments allowed).
+.TP
+.B ~/.config/rustfetch/themes/
+Directory for user-defined theme JSONC files.
+.TP
+.B ~/.config/fastfetch/config.jsonc
+Default location searched by
+.B \-\-import\-fastfetch
+when no path is given.
+.SH EXAMPLES
+.TP
+Interactive setup:
+.nf
+.B rustfetch \-\-setup
+.fi
+.TP
+One-shot theme:
+.nf
+.B rustfetch \-\-theme groups
+.fi
+.TP
+Import a fastfetch config (dry-run):
+.nf
+.B rustfetch \-\-import\-fastfetch ~/.config/fastfetch/config.jsonc \-\-dry\-run
+.fi
+.TP
+Import and overwrite the rustfetch config:
+.nf
+.B rustfetch \-\-import\-fastfetch \-\-force
+.fi
+.TP
+Show empty modules:
+.nf
+.B rustfetch \-\-show\-empty
+.fi
+.TP
+JSON output:
+.nf
+.B rustfetch \-\-json
+.fi
+.TP
+Generate bash completions:
+.nf
+.B rustfetch \-\-completions bash > ~/.local/share/bash\-completion/completions/rustfetch
+.fi
+.TP
+Custom module structure without logo:
+.nf
+.B rustfetch \-\-no\-logo \-\-structure title:os:kernel:cpu:gpu:memory:colors
+.fi
+.SH SEE ALSO
+Project homepage:
+.UR https://github.com/zackmsa777-a11y/rustfetch
+.UE
+.br
+crates.io package
+.B rustftechh
+(binary
+.BR rustfetch ):
+.UR https://docs.rs/rustftechh
+.UE
+.br
+Install:
+.B cargo install rustftechh \-\-locked
+.SH AUTHOR
+Zack <https://github.com/zackmsa777-a11y>

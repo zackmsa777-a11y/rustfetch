@@ -1,0 +1,70 @@
+# Maintainer: Zack <https://github.com/zackmsa777-a11y>
+# AUR stub — do not upload until a tagged release exists and checksums are filled.
+#
+# crates.io / AUR pkgname: rustftechh
+# GitHub repo / installed binary: rustfetch
+#
+# After release vX.Y.Z:
+#   1. Update pkgver (no leading "v")
+#   2. Download source tarball and set sha256sums:
+#        sha256sum rustfetch-X.Y.Z.tar.gz
+#   3. Generate .SRCINFO: `makepkg --printsrcinfo > .SRCINFO`
+#   4. Push to AUR (ssh://aur@aur.archlinux.org/rustftechh.git) — not done from CI here.
+#
+# Binary package alternative: use release asset
+#   rustfetch-vX.Y.Z-x86_64-unknown-linux-gnu.tar.gz
+# and set arch=(x86_64) with appropriate source URL.
+
+_pkgname=rustfetch
+pkgname=rustftechh
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Blazingly fast system information fetch tool written in Rust"
+arch=('x86_64' 'aarch64')
+url="https://github.com/zackmsa777-a11y/rustfetch"
+license=('MIT' 'Apache-2.0')
+depends=()
+makedepends=('cargo')
+provides=('rustfetch')
+conflicts=('rustfetch')
+# GitHub archive extracts to ${_pkgname}-${pkgver} (repo name), not ${pkgname}
+source=("${_pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver}.tar.gz")
+sha256sums=('REPLACE_WITH_SHA256_OF_SOURCE_TARBALL')
+
+prepare() {
+  cd "${_pkgname}-${pkgver}"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "${_pkgname}-${pkgver}"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release
+}
+
+check() {
+  cd "${_pkgname}-${pkgver}"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo test --frozen
+}
+
+package() {
+  cd "${_pkgname}-${pkgver}"
+  install -Dm755 "target/release/rustfetch" "${pkgdir}/usr/bin/rustfetch"
+  install -Dm644 LICENSE-MIT "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE-MIT"
+  install -Dm644 LICENSE-APACHE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE-APACHE"
+  if [[ -f man/rustfetch.1 ]]; then
+    install -Dm644 man/rustfetch.1 "${pkgdir}/usr/share/man/man1/rustfetch.1"
+  fi
+  if [[ -f completions/rustfetch.bash ]]; then
+    install -Dm644 completions/rustfetch.bash "${pkgdir}/usr/share/bash-completion/completions/rustfetch"
+  fi
+  if [[ -f completions/rustfetch.zsh ]]; then
+    install -Dm644 completions/rustfetch.zsh "${pkgdir}/usr/share/zsh/site-functions/_rustfetch"
+  fi
+  if [[ -f completions/rustfetch.fish ]]; then
+    install -Dm644 completions/rustfetch.fish "${pkgdir}/usr/share/fish/vendor_completions.d/rustfetch.fish"
+  fi
+}

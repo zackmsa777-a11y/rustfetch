@@ -451,6 +451,392 @@ pub fn render_kitty_image_lines(
     Ok(out)
 }
 
+pub fn supports_iterm() -> bool {
+    if env::var("ITERM_SESSION_ID").is_ok() {
+        return true;
+    }
+    if env::var("TERM_PROGRAM")
+        .map(|p| {
+            let p = p.to_lowercase();
+            p == "iterm.app" || p.contains("iterm")
+        })
+        .unwrap_or(false)
+    {
+        return true;
+    }
+    if env::var("LC_TERMINAL")
+        .map(|t| t.to_lowercase().contains("iterm"))
+        .unwrap_or(false)
+    {
+        return true;
+    }
+    false
+}
+
+pub fn supports_sixel() -> bool {
+    if let Ok(term) = env::var("TERM") {
+        let t = term.to_lowercase();
+        if t.contains("sixel") || t.contains("mlterm") || t.contains("yaft") {
+            return true;
+        }
+    }
+    if env::var("WT_SESSION").is_ok() {
+        return true;
+    }
+    if let Ok(prog) = env::var("TERM_PROGRAM") {
+        let p = prog.to_lowercase();
+        if p == "wezterm" || p == "foot" {
+            return true;
+        }
+    }
+    if env::var("TERM_PROGRAM")
+        .map(|p| p.eq_ignore_ascii_case("contour"))
+        .unwrap_or(false)
+    {
+        return true;
+    }
+    false
+}
+
+pub fn detect_image_protocol() -> Option<&'static str> {
+    if supports_kitty_graphics() {
+        return Some("kitty");
+    }
+    if supports_iterm() {
+        return Some("iterm");
+    }
+    if supports_sixel() {
+        return Some("sixel");
+    }
+    None
+}
+
+#[cfg(test)]
+pub fn detect_image_protocol_from_hints(
+    term: Option<&str>,
+    term_program: Option<&str>,
+    lc_terminal: Option<&str>,
+    kitty_window: bool,
+    iterm_session: bool,
+    wt_session: bool,
+) -> Option<&'static str> {
+    let prog = term_program.map(|s| s.to_lowercase()).unwrap_or_default();
+    let term_l = term.map(|s| s.to_lowercase()).unwrap_or_default();
+    let lc = lc_terminal.map(|s| s.to_lowercase()).unwrap_or_default();
+
+    if kitty_window
+        || term_l == "xterm-kitty"
+        || prog == "kitty"
+        || prog == "wezterm"
+        || prog == "ghostty"
+        || prog == "foot"
+        || lc.contains("kitty")
+        || lc.contains("wezterm")
+    {
+        return Some("kitty");
+    }
+    if iterm_session || prog == "iterm.app" || prog.contains("iterm") || lc.contains("iterm") {
+        return Some("iterm");
+    }
+    if term_l.contains("sixel")
+        || term_l.contains("mlterm")
+        || term_l.contains("yaft")
+        || wt_session
+        || prog == "contour"
+    {
+        return Some("sixel");
+    }
+    None
+}
+
+pub fn resolve_logo_protocol(logo_type: Option<&str>) -> Option<&'static str> {
+    match logo_type {
+        Some("kitty") => Some("kitty"),
+        Some("kitty-direct") => Some("kitty-direct"),
+        Some("kitty-icat") => Some("kitty-icat"),
+        Some("sixel") => Some("sixel"),
+        Some("iterm") | Some("iterm2") => Some("iterm"),
+        Some("auto") | None => detect_image_protocol(),
+        _ => None,
+    }
+}
+
+const SIXEL_CELL_PX_W: u32 = 10;
+const SIXEL_CELL_PX_H: u32 = 20;
+const SIXEL_MAX_PX_W: u32 = 800;
+const SIXEL_MAX_PX_H: u32 = 600;
+
+fn quantize_channel(v: u8) -> u8 {
+    let q = ((u16::from(v) * 5 + 127) / 255) as u8;
+    q * 51
+}
+
+fn nearest_palette_index(palette: &[(u8, u8, u8)], r: u8, g: u8, b: u8) -> usize {
+    let mut best = 0usize;
+    let mut best_dist = u32::MAX;
+    for (i, &(pr, pg, pb)) in palette.iter().enumerate() {
+        let dr = i32::from(pr) - i32::from(r);
+        let dg = i32::from(pg) - i32::from(g);
+        let db = i32::from(pb) - i32::from(b);
+        let dist = (dr * dr + dg * dg + db * db) as u32;
+        if dist < best_dist {
+            best_dist = dist;
+            best = i;
+        }
+    }
+    best
+}
+
+fn palette_index(palette: &mut Vec<(u8, u8, u8)>, r: u8, g: u8, b: u8) -> usize {
+    let rq = quantize_channel(r);
+    let gq = quantize_channel(g);
+    let bq = quantize_channel(b);
+    if let Some(i) = palette.iter().position(|&c| c == (rq, gq, bq)) {
+        return i;
+    }
+    if palette.len() < 256 {
+        palette.push((rq, gq, bq));
+        return palette.len() - 1;
+    }
+    nearest_palette_index(palette, rq, gq, bq)
+}
+
+pub fn encode_sixel_rgba(rgba: &[u8], width: u32, height: u32) -> String {
+    let w = width as usize;
+    let h = height as usize;
+    let mut palette: Vec<(u8, u8, u8)> = Vec::new();
+    let mut indices: Vec<Option<usize>> = Vec::with_capacity(w * h);
+
+    for y in 0..h {
+        for x in 0..w {
+            let i = (y * w + x) * 4;
+            let r = rgba[i];
+            let g = rgba[i + 1];
+            let b = rgba[i + 2];
+            let a = rgba[i + 3];
+            if a < 128 {
+                indices.push(None);
+            } else {
+                indices.push(Some(palette_index(&mut palette, r, g, b)));
+            }
+        }
+    }
+
+    let mut out = String::with_capacity(w * h / 2 + 256);
+    out.push_str("\x1bPq");
+    out.push_str(&format!("\"1;1;{width};{height}"));
+
+    for (i, &(r, g, b)) in palette.iter().enumerate() {
+        let pr = (u32::from(r) * 100 + 127) / 255;
+        let pg = (u32::from(g) * 100 + 127) / 255;
+        let pb = (u32::from(b) * 100 + 127) / 255;
+        out.push_str(&format!("#{i};2;{pr};{pg};{pb}"));
+    }
+
+    let bands = h.div_ceil(6);
+    for band in 0..bands {
+        let y0 = band * 6;
+        let mut used = vec![false; palette.len()];
+        for y in y0..(y0 + 6).min(h) {
+            for x in 0..w {
+                if let Some(idx) = indices[y * w + x] {
+                    used[idx] = true;
+                }
+            }
+        }
+
+        let active: Vec<usize> = used
+            .iter()
+            .enumerate()
+            .filter_map(|(i, u)| if *u { Some(i) } else { None })
+            .collect();
+
+        if active.is_empty() {
+            out.push('-');
+            continue;
+        }
+
+        for (color_n, &color) in active.iter().enumerate() {
+            out.push_str(&format!("#{color}"));
+            for x in 0..w {
+                let mut sixel: u8 = 0;
+                for bit in 0..6 {
+                    let y = y0 + bit;
+                    if y < h && indices[y * w + x] == Some(color) {
+                        sixel |= 1 << bit;
+                    }
+                }
+                out.push(char::from(63 + sixel));
+            }
+            if color_n + 1 < active.len() {
+                out.push('$');
+            }
+        }
+        out.push('-');
+    }
+
+    out.push_str("\x1b\\");
+    out
+}
+
+pub fn generate_sixel_escape(
+    path: &Path,
+    width_cells: usize,
+    height_cells: usize,
+) -> Result<String, String> {
+    let img = image::open(path).map_err(|e| format!("failed to decode image: {e}"))?;
+    let rgba = img.to_rgba8();
+    let (src_w, src_h) = rgba.dimensions();
+    if src_w == 0 || src_h == 0 {
+        return Err("image has zero dimensions".into());
+    }
+
+    let mut target_w = (width_cells as u32).saturating_mul(SIXEL_CELL_PX_W).max(1);
+    let mut target_h = (height_cells as u32).saturating_mul(SIXEL_CELL_PX_H).max(1);
+    if target_w > SIXEL_MAX_PX_W {
+        let scale = SIXEL_MAX_PX_W as f64 / target_w as f64;
+        target_w = SIXEL_MAX_PX_W;
+        target_h = ((target_h as f64) * scale).round().max(1.0) as u32;
+    }
+    if target_h > SIXEL_MAX_PX_H {
+        let scale = SIXEL_MAX_PX_H as f64 / target_h as f64;
+        target_h = SIXEL_MAX_PX_H;
+        target_w = ((target_w as f64) * scale).round().max(1.0) as u32;
+    }
+
+    let resized = image::imageops::resize(
+        &rgba,
+        target_w,
+        target_h,
+        image::imageops::FilterType::Triangle,
+    );
+    Ok(encode_sixel_rgba(resized.as_raw(), target_w, target_h))
+}
+
+pub fn generate_iterm_escape(path: &Path, width: usize, height: usize) -> Result<String, String> {
+    let abs_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    if !abs_path.exists() {
+        return Err(format!("image file does not exist: {}", abs_path.display()));
+    }
+    let file_bytes = fs::read(&abs_path)
+        .map_err(|e| format!("failed to read image file {}: {e}", abs_path.display()))?;
+    let b64 = base64_encode(&file_bytes);
+    let name = abs_path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "logo".into());
+    let name_b64 = base64_encode(name.as_bytes());
+    Ok(format!(
+        "\x1b]1337;File=name={name_b64};inline=1;width={width};height={height};preserveAspectRatio=1:{b64}\x07"
+    ))
+}
+
+fn render_placed_protocol_lines(
+    escape: &str,
+    width: usize,
+    height: usize,
+    opts: &KittyImageOptions,
+    module_lines: &[String],
+    retain_cursor: bool,
+) -> Vec<String> {
+    let gap = opts.padding_right.max(3);
+    let offset = opts.padding_left + width + gap;
+    let total_lines = (opts.padding_top + height).max(module_lines.len());
+    let mut out = Vec::with_capacity(total_lines + 1);
+
+    let mut header = String::new();
+    if opts.padding_top > 0 {
+        header.push_str(&"\n".repeat(opts.padding_top));
+    }
+    if opts.padding_left > 0 {
+        header.push_str(&format!("\x1b[{}C", opts.padding_left));
+    }
+    header.push_str(escape);
+    if !retain_cursor && height > 0 {
+        header.push_str(&format!("\x1b[{height}A"));
+    }
+
+    for i in 0..total_lines {
+        let text = module_lines.get(i).map(|s| s.as_str()).unwrap_or("");
+        let line_content = if i == 0 {
+            format!("{header}\x1b[{offset}C{text}")
+        } else if !text.is_empty() {
+            format!("\x1b[{offset}C{text}")
+        } else {
+            format!("\x1b[{offset}C")
+        };
+        out.push(line_content);
+    }
+    out
+}
+
+pub fn render_sixel_image_lines(
+    path: &Path,
+    opts: &KittyImageOptions,
+    module_lines: &[String],
+) -> Result<Vec<String>, String> {
+    let px_dims = probe_image_dimensions(path);
+    let (width, height) = calculate_cell_dimensions(px_dims, opts.req_w, opts.req_h);
+    let escape = generate_sixel_escape(path, width, height)?;
+    Ok(render_placed_protocol_lines(
+        &escape,
+        width,
+        height,
+        opts,
+        module_lines,
+        false,
+    ))
+}
+
+pub fn render_iterm_image_lines(
+    path: &Path,
+    opts: &KittyImageOptions,
+    module_lines: &[String],
+) -> Result<Vec<String>, String> {
+    let px_dims = probe_image_dimensions(path);
+    let (width, height) = calculate_cell_dimensions(px_dims, opts.req_w, opts.req_h);
+    let escape = generate_iterm_escape(path, width, height)?;
+    Ok(render_placed_protocol_lines(
+        &escape,
+        width,
+        height,
+        opts,
+        module_lines,
+        false,
+    ))
+}
+
+pub fn render_image_logo_lines(
+    path: &Path,
+    protocol: &str,
+    opts: &KittyImageOptions,
+    module_lines: &[String],
+) -> Result<Vec<String>, String> {
+    match protocol {
+        "kitty" => {
+            let mut o = *opts;
+            o.direct = false;
+            o.icat = false;
+            render_kitty_image_lines(path, &o, module_lines)
+        }
+        "kitty-direct" => {
+            let mut o = *opts;
+            o.direct = true;
+            o.icat = false;
+            render_kitty_image_lines(path, &o, module_lines)
+        }
+        "kitty-icat" => {
+            let mut o = *opts;
+            o.direct = opts.direct;
+            o.icat = true;
+            render_kitty_image_lines(path, &o, module_lines)
+        }
+        "sixel" => render_sixel_image_lines(path, opts, module_lines),
+        "iterm" | "iterm2" => render_iterm_image_lines(path, opts, module_lines),
+        other => Err(format!("unsupported image logo protocol: {other}")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -503,5 +889,88 @@ mod tests {
         assert!(sample.is_some());
         let path = sample.unwrap();
         assert!(path.exists());
+    }
+
+    #[test]
+    fn test_sixel_framing_with_fixture_png() {
+        let rgba = [
+            255u8, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255, 128, 128, 128, 255,
+            0, 0, 0, 255, 255, 0, 255, 255, 0, 255, 255, 255,
+        ];
+        let sixel = encode_sixel_rgba(&rgba, 4, 2);
+        assert!(sixel.starts_with("\x1bPq"), "DCS start missing: {sixel:?}");
+        assert!(sixel.ends_with("\x1b\\"), "ST end missing");
+        assert!(sixel.contains("\"1;1;4;2"));
+        assert!(sixel.contains("#0;2;"));
+    }
+
+    #[test]
+    fn test_sixel_escape_from_sample_png() {
+        let sample = resolve_image_path("kitty:example").expect("sample");
+        let esc = generate_sixel_escape(&sample, 12, 8).expect("sixel");
+        assert!(esc.starts_with("\x1bPq"));
+        assert!(esc.ends_with("\x1b\\"));
+        assert!(esc.len() > 32);
+    }
+
+    #[test]
+    fn test_iterm_escape_framing() {
+        let sample = resolve_image_path("kitty:example").expect("sample");
+        let esc = generate_iterm_escape(&sample, 20, 10).expect("iterm");
+        assert!(esc.starts_with("\x1b]1337;File="));
+        assert!(esc.contains("inline=1"));
+        assert!(esc.contains("width=20"));
+        assert!(esc.contains("height=10"));
+        assert!(esc.contains("preserveAspectRatio=1:"));
+        assert!(esc.ends_with('\x07'));
+        let payload = esc.split_once(':').expect("payload").1;
+        assert!(payload.ends_with('\x07'));
+        assert!(payload.len() > 8);
+    }
+
+    #[test]
+    fn test_detect_image_protocol_hints() {
+        assert_eq!(
+            detect_image_protocol_from_hints(Some("xterm-kitty"), None, None, false, false, false),
+            Some("kitty")
+        );
+        assert_eq!(
+            detect_image_protocol_from_hints(None, Some("WezTerm"), None, false, false, false),
+            Some("kitty")
+        );
+        assert_eq!(
+            detect_image_protocol_from_hints(None, Some("iTerm.app"), None, false, true, false),
+            Some("iterm")
+        );
+        assert_eq!(
+            detect_image_protocol_from_hints(Some("xterm-sixel"), None, None, false, false, false),
+            Some("sixel")
+        );
+        assert_eq!(
+            detect_image_protocol_from_hints(None, None, None, false, false, true),
+            Some("sixel")
+        );
+        assert_eq!(
+            detect_image_protocol_from_hints(
+                Some("xterm-256color"),
+                None,
+                None,
+                false,
+                false,
+                false
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn test_resolve_logo_protocol_explicit() {
+        assert_eq!(resolve_logo_protocol(Some("sixel")), Some("sixel"));
+        assert_eq!(resolve_logo_protocol(Some("iterm2")), Some("iterm"));
+        assert_eq!(
+            resolve_logo_protocol(Some("kitty-direct")),
+            Some("kitty-direct")
+        );
+        assert_eq!(resolve_logo_protocol(Some("builtin")), None);
     }
 }
