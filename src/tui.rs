@@ -29,14 +29,24 @@ pub fn preview_all(
     no_logo: bool,
     logo_override: Option<&str>,
 ) {
-    let themes = config::all_themes(cfg);
+    let themes = config::all_themes_for_distro(cfg, Some(&info.distro_id));
+    let detected_hdr = if !info.distro_name.is_empty() {
+        format!(" (detected: {})", info.distro_name)
+    } else {
+        String::new()
+    };
     println!(
-        "\x1b[1;36m=== rustfetch theme gallery ({} available) ===\x1b[0m\n",
-        themes.len()
+        "\x1b[1;36m=== rustfetch theme gallery ({} available{}) ===\x1b[0m\n",
+        themes.len(),
+        detected_hdr
     );
 
     for entry in &themes {
-        let tag = entry.source.tag();
+        let tag = if entry.matches_distro(&info.distro_id) {
+            "rec"
+        } else {
+            entry.source.tag()
+        };
         let layout_tag = if entry.def.has_layout() {
             " [layout]"
         } else {
@@ -131,8 +141,14 @@ impl TerminalGuard {
             }
 
             let mut out = io::stdout();
-            // Alternate screen buffer, hide cursor, clear
-            let _ = write!(out, "\x1b[?1049h\x1b[?25l\x1b[2J\x1b[H");
+            // Alternate screen buffer, hide cursor, enable mouse tracking:
+            // \x1b[?1000h (VT200 mouse clicks)
+            // \x1b[?1002h (button event reporting, e.g. scroll wheels)
+            // \x1b[?1006h (SGR extended coordinate mode)
+            let _ = write!(
+                out,
+                "\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1002h\x1b[?1006h\x1b[2J\x1b[H"
+            );
             let _ = out.flush();
 
             Ok(Self { fd, orig })
@@ -144,8 +160,8 @@ impl TerminalGuard {
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
         let mut out = io::stdout();
-        // Restore cursor, leave alternate screen buffer
-        let _ = write!(out, "\x1b[?25h\x1b[?1049l");
+        // Disable mouse tracking, restore cursor, leave alternate screen buffer
+        let _ = write!(out, "\x1b[?1006l\x1b[?1002l\x1b[?1000l\x1b[?25h\x1b[?1049l");
         let _ = out.flush();
         unsafe {
             libc::tcsetattr(self.fd, libc::TCSADRAIN, &self.orig);
@@ -163,6 +179,9 @@ enum Key {
     Enter,
     Export,
     Quit,
+    ScrollUp,
+    ScrollDown,
+    MouseClick { x: usize, y: usize },
     Other,
 }
 
@@ -220,6 +239,36 @@ fn read_key() -> Key {
                         let mut t = [0u8; 1];
                         let _ = lock.read_exact(&mut t);
                         Key::End
+                    }
+                    b'<' => {
+                        // SGR mouse sequence: \x1b[<btn;x;y(M|m)
+                        let mut mouse_str = String::new();
+                        let mut final_char = 'M';
+                        for _ in 0..40 {
+                            let mut ch = [0u8; 1];
+                            if lock.read_exact(&mut ch).is_err() {
+                                return Key::Other;
+                            }
+                            if ch[0] == b'M' || ch[0] == b'm' {
+                                final_char = ch[0] as char;
+                                break;
+                            }
+                            mouse_str.push(ch[0] as char);
+                        }
+                        let parts: Vec<&str> = mouse_str.split(';').collect();
+                        if parts.len() == 3 {
+                            let btn: u32 = parts[0].parse().unwrap_or(0);
+                            let x: usize = parts[1].parse().unwrap_or(1);
+                            let y: usize = parts[2].parse().unwrap_or(1);
+                            if btn == 64 {
+                                return Key::ScrollUp;
+                            } else if btn == 65 {
+                                return Key::ScrollDown;
+                            } else if final_char == 'M' && (btn & 3) == 0 && (btn & 32) == 0 {
+                                return Key::MouseClick { x, y };
+                            }
+                        }
+                        Key::Other
                     }
                     _ => Key::Other,
                 }
@@ -302,10 +351,17 @@ fn render_tui(
     }
 
     // Subtitle / Tagline
+    let detected_pc = if !info.distro_name.is_empty() {
+        format!("PC: {}", info.distro_name)
+    } else if !info.distro_id.is_empty() {
+        format!("PC: {}", info.distro_id)
+    } else {
+        banner::TAGLINE.to_string()
+    };
     let subtitle = format!(
-        "⚡ rustfetch v{} ─ {} ⚡",
+        "⚡ rustfetch v{} ─ {} ─ [Mouse + Keyboard enabled] ⚡",
         env!("CARGO_PKG_VERSION"),
-        banner::TAGLINE
+        detected_pc
     );
     let sub_pad = (cols.saturating_sub(visible_width(&subtitle))) / 2;
     screen.push_str(&" ".repeat(sub_pad));
@@ -398,10 +454,14 @@ fn render_tui(
                 let prefix = if is_sel { "\x1b[1;32m▸ " } else { "  " };
                 let dot = format!("{dot_col}●\x1b[0m");
 
-                let tag_str = match t.source {
-                    ThemeSource::Builtin => "\x1b[90mpreset\x1b[0m",
-                    ThemeSource::File(_) => "\x1b[33mfile\x1b[0m",
-                    ThemeSource::Config => "\x1b[35mcfg\x1b[0m",
+                let tag_str = if t.matches_distro(&info.distro_id) {
+                    "\x1b[1;32m★ rec\x1b[0m"
+                } else {
+                    match t.source {
+                        ThemeSource::Builtin => "\x1b[90mpreset\x1b[0m",
+                        ThemeSource::File(_) => "\x1b[33mfile\x1b[0m",
+                        ThemeSource::Config => "\x1b[35mcfg\x1b[0m",
+                    }
                 };
 
                 let active_marker = if is_active {
@@ -480,10 +540,18 @@ fn render_tui(
                 } else {
                     "  \x1b[0m"
                 };
+                let tag_str = if t.matches_distro(&info.distro_id) {
+                    "\x1b[1;32m★ rec\x1b[0m"
+                } else {
+                    match t.source {
+                        ThemeSource::Builtin => "\x1b[90mpreset\x1b[0m",
+                        ThemeSource::File(_) => "\x1b[33mfile\x1b[0m",
+                        ThemeSource::Config => "\x1b[35mcfg\x1b[0m",
+                    }
+                };
                 screen.push_str(&format!(
-                    "{prefix}{dot_col}●\x1b[0m {:<14} [{}]\x1b[0m\x1b[K\r\n",
+                    "{prefix}{dot_col}●\x1b[0m {:<14} [{tag_str}]\x1b[0m\x1b[K\r\n",
                     t.name,
-                    t.source.tag()
                 ));
             }
         }
@@ -510,7 +578,7 @@ fn render_tui(
     screen.push_str("\x1b[0m\x1b[K\r\n");
 
     // Shortcut bar
-    let keys_hint = "\x1b[1;37m[↑/k, ↓/j]\x1b[0m Select  \x1b[1;32m[Enter]\x1b[0m Apply & Save  \x1b[1;33m[e]\x1b[0m Export Theme  \x1b[1;31m[q/Esc]\x1b[0m Quit";
+    let keys_hint = "\x1b[1;37m[Click / ↑↓]\x1b[0m Select  \x1b[1;32m[Click / Enter]\x1b[0m Apply  \x1b[1;33m[e]\x1b[0m Export  \x1b[1;31m[q]\x1b[0m Quit";
     let active_name_str = active_theme_name.unwrap_or("default");
     let active_status = format!("Active: \x1b[1;32m{active_name_str}\x1b[0m");
 
@@ -524,7 +592,7 @@ fn render_tui(
     if let Some(msg) = status_msg {
         screen.push_str(msg);
     } else {
-        screen.push_str("\x1b[90mTip: Drop custom *.jsonc presets into ~/.config/rustfetch/themes/ or define in config\x1b[0m");
+        screen.push_str("\x1b[90mTip: Click theme to preview, double-click or Enter to apply, scroll wheel to browse\x1b[0m");
     }
     screen.push_str("\x1b[K");
 
@@ -580,7 +648,7 @@ pub fn run_setup(
     no_logo: bool,
     logo_override: Option<&str>,
 ) -> Result<(), String> {
-    let themes = config::all_themes(cfg);
+    let themes = config::all_themes_for_distro(cfg, Some(&info.distro_id));
     if themes.is_empty() {
         return Err("no themes available".into());
     }
@@ -642,6 +710,131 @@ pub fn run_setup(
                 Key::End => {
                     selected = themes.len() - 1;
                     status_msg = None;
+                }
+                Key::ScrollUp => {
+                    selected = selected.saturating_sub(1);
+                    status_msg = None;
+                }
+                Key::ScrollDown => {
+                    selected = (selected + 1).min(themes.len() - 1);
+                    status_msg = None;
+                }
+                Key::MouseClick { x, y } => {
+                    let (cols, rows) = terminal_dimensions();
+                    let mut header_rows = 0;
+                    if let Some(art_lines) = banner::for_width(cols) {
+                        header_rows += art_lines.len();
+                    }
+                    header_rows += 2; // subtitle + divider
+                    let footer_rows = 3;
+                    let main_rows = rows.saturating_sub(header_rows + footer_rows).max(6);
+                    let is_split = cols >= 88;
+
+                    // Click on footer buttons (row rows - 1 is shortcut bar, row rows is tip)
+                    if y >= rows.saturating_sub(2) {
+                        if (20..=42).contains(&x) {
+                            // [Click / Enter] Apply & Save
+                            drop(_guard);
+                            let chosen = &themes[selected].name;
+                            let target = config::save_theme_name(config_path, chosen)?;
+                            println!(
+                                "\x1b[1;32m✓ Theme '{chosen}' successfully applied and saved to {}\x1b[0m",
+                                target.display()
+                            );
+                            return Ok(());
+                        } else if (43..=54).contains(&x) {
+                            // [e] Export Theme
+                            let entry = &themes[selected];
+                            let export_name = format!("{}-custom", entry.name);
+                            match config::export_theme(config_path, &entry.def, &export_name) {
+                                Ok(target) => {
+                                    status_msg = Some(format!(
+                                        "\x1b[1;32m✓ Exported theme '{}' to {} and set active!\x1b[0m",
+                                        export_name,
+                                        target.display()
+                                    ));
+                                }
+                                Err(e) => {
+                                    status_msg = Some(format!(
+                                        "\x1b[1;31m✗ Failed to export theme: {e}\x1b[0m"
+                                    ));
+                                }
+                            }
+                        } else if (55..=68).contains(&x) {
+                            // [q] Quit
+                            drop(_guard);
+                            println!("Setup closed without saving changes.");
+                            return Ok(());
+                        }
+                    } else if is_split {
+                        let left_width = 38.min(cols / 3 + 6);
+                        let max_list_items = main_rows.saturating_sub(2);
+                        let scroll_offset = if selected < max_list_items / 2 {
+                            0
+                        } else if selected + max_list_items / 2 >= themes.len() {
+                            themes.len().saturating_sub(max_list_items)
+                        } else {
+                            selected.saturating_sub(max_list_items / 2)
+                        };
+                        let list_start_y = header_rows + 2;
+                        let list_end_y = list_start_y + main_rows.saturating_sub(1);
+                        if x <= left_width && y >= list_start_y && y < list_end_y {
+                            let row = y - list_start_y;
+                            let target_idx = scroll_offset + row;
+                            if target_idx < themes.len() {
+                                if target_idx == selected {
+                                    drop(_guard);
+                                    let chosen = &themes[selected].name;
+                                    let target = config::save_theme_name(config_path, chosen)?;
+                                    println!(
+                                        "\x1b[1;32m✓ Theme '{chosen}' successfully applied and saved to {}\x1b[0m",
+                                        target.display()
+                                    );
+                                    return Ok(());
+                                } else {
+                                    selected = target_idx;
+                                    status_msg = Some(format!(
+                                        "\x1b[1;36mPreviewing '{}' (click again or press Enter to apply)\x1b[0m",
+                                        themes[selected].name
+                                    ));
+                                }
+                            }
+                        }
+                    } else {
+                        // Narrow mode
+                        let max_list = (main_rows / 2).max(4);
+                        let scroll_offset = if selected < max_list / 2 {
+                            0
+                        } else if selected + max_list / 2 >= themes.len() {
+                            themes.len().saturating_sub(max_list)
+                        } else {
+                            selected.saturating_sub(max_list / 2)
+                        };
+                        let list_start_y = header_rows + 2;
+                        let list_end_y = list_start_y + max_list;
+                        if y >= list_start_y && y < list_end_y {
+                            let row = y - list_start_y;
+                            let target_idx = scroll_offset + row;
+                            if target_idx < themes.len() {
+                                if target_idx == selected {
+                                    drop(_guard);
+                                    let chosen = &themes[selected].name;
+                                    let target = config::save_theme_name(config_path, chosen)?;
+                                    println!(
+                                        "\x1b[1;32m✓ Theme '{chosen}' successfully applied and saved to {}\x1b[0m",
+                                        target.display()
+                                    );
+                                    return Ok(());
+                                } else {
+                                    selected = target_idx;
+                                    status_msg = Some(format!(
+                                        "\x1b[1;36mPreviewing '{}' (click again or press Enter to apply)\x1b[0m",
+                                        themes[selected].name
+                                    ));
+                                }
+                            }
+                        }
+                    }
                 }
                 Key::Export => {
                     let entry = &themes[selected];

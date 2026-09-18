@@ -56,9 +56,20 @@ fn main() {
     let mut file_cfg = load_config(cli_opts.config_path.as_deref());
 
     if cli_opts.list_themes {
-        println!("Available rustfetch themes:");
-        for entry in config::all_themes(&file_cfg) {
-            println!("  - {}", tui::describe(&entry.name, &entry.def));
+        let (_, distro_id, distro_name) = crate::info::os::detect_os();
+        let themes = config::all_themes_for_distro(&file_cfg, Some(&distro_id));
+        if !distro_name.is_empty() {
+            println!("Available rustfetch themes (detected: {distro_name}):");
+        } else {
+            println!("Available rustfetch themes:");
+        }
+        for entry in themes {
+            let rec = if entry.matches_distro(&distro_id) {
+                " \x1b[1;32m[recommended]\x1b[0m"
+            } else {
+                ""
+            };
+            println!("  - {}{rec}", tui::describe(&entry.name, &entry.def));
         }
         println!(
             "\nCustom themes: add .jsonc files to ~/.config/rustfetch/themes/ or define in config."
@@ -460,5 +471,43 @@ mod tests {
 
         let (windows, _) = get_logo("windows", false, None);
         assert!(!windows.is_empty());
+    }
+
+    #[test]
+    fn resolves_custom_art_pieces() {
+        use crate::art;
+        assert!(art::art("ferris").is_some());
+        assert!(art::art("crab").is_some());
+        assert!(art::art("tux").is_some());
+        assert!(art::art("penguin").is_some());
+        assert!(art::art("ubuntu-mini").is_some());
+        assert!(art::art("coffee").is_some());
+        assert!(art::art("heart").is_some());
+        assert!(art::art("ghost").is_some());
+        assert!(art::art("arch-mini").is_some());
+    }
+
+    #[test]
+    fn distro_theme_prioritization() {
+        use crate::config;
+        let cfg = Config::default();
+
+        // On Ubuntu: Ubuntu themes must appear at the top
+        let ubuntu_themes = config::all_themes_for_distro(&cfg, Some("ubuntu"));
+        assert!(ubuntu_themes.len() > 5);
+        assert!(ubuntu_themes[0].matches_distro("ubuntu"));
+        assert!(ubuntu_themes[1].matches_distro("ubuntu"));
+        assert!(ubuntu_themes[2].matches_distro("ubuntu"));
+        assert!(ubuntu_themes[0].name.starts_with("ubuntu-"));
+
+        // On Arch: Arch themes must appear at the top
+        let arch_themes = config::all_themes_for_distro(&cfg, Some("arch"));
+        assert!(arch_themes[0].matches_distro("arch"));
+        assert_eq!(arch_themes[0].name, "arch-clean");
+
+        // On Debian: Debian themes must appear at the top
+        let debian_themes = config::all_themes_for_distro(&cfg, Some("debian"));
+        assert!(debian_themes[0].matches_distro("debian"));
+        assert_eq!(debian_themes[0].name, "debian-swirl");
     }
 }

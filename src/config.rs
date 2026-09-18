@@ -166,6 +166,8 @@ pub struct ThemeDef {
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
+    pub distro: Option<String>,
+    #[serde(default)]
     pub title: Option<String>,
     #[serde(default)]
     pub keys: Option<String>,
@@ -191,6 +193,7 @@ impl ThemeDef {
                 .description
                 .clone()
                 .or_else(|| self.description.clone()),
+            distro: other.distro.clone().or_else(|| self.distro.clone()),
             title: other.title.clone().or_else(|| self.title.clone()),
             keys: other.keys.clone().or_else(|| self.keys.clone()),
             value: other.value.clone().or_else(|| self.value.clone()),
@@ -270,6 +273,8 @@ pub struct ThemeSetting {
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
+    pub distro: Option<String>,
+    #[serde(default)]
     pub title: Option<String>,
     #[serde(default)]
     pub keys: Option<String>,
@@ -297,6 +302,7 @@ impl ThemeSetting {
     pub fn overrides(&self) -> ThemeDef {
         ThemeDef {
             description: self.description.clone(),
+            distro: self.distro.clone(),
             title: self.title.clone(),
             keys: self.keys.clone(),
             value: self.value.clone(),
@@ -359,6 +365,26 @@ pub struct ThemeEntry {
     pub name: String,
     pub source: ThemeSource,
     pub def: ThemeDef,
+}
+
+impl ThemeEntry {
+    /// Check if this theme matches or is tailored for the given Linux distro ID (e.g. "ubuntu").
+    pub fn matches_distro(&self, distro_id: &str) -> bool {
+        let id = distro_id.trim().to_lowercase();
+        if id.is_empty() {
+            return false;
+        }
+        if let Some(ref d) = self.def.distro
+            && d.trim().eq_ignore_ascii_case(&id)
+        {
+            return true;
+        }
+        let n = self.name.to_lowercase();
+        if n.starts_with(&format!("{id}-")) || n.starts_with(&format!("{id}_")) || n == id {
+            return true;
+        }
+        false
+    }
 }
 
 pub fn dirs_home() -> Option<PathBuf> {
@@ -495,6 +521,28 @@ pub fn all_themes(cfg: &Config) -> Vec<ThemeEntry> {
     }
 
     entries
+}
+
+/// All themes ordered with detected distro-specific themes at the top of the gallery.
+pub fn all_themes_for_distro(cfg: &Config, distro_id: Option<&str>) -> Vec<ThemeEntry> {
+    let all = all_themes(cfg);
+    if let Some(distro) = distro_id {
+        let d = distro.trim().to_lowercase();
+        if !d.is_empty() {
+            let mut matches = Vec::new();
+            let mut rest = Vec::new();
+            for entry in all {
+                if entry.matches_distro(&d) {
+                    matches.push(entry);
+                } else {
+                    rest.push(entry);
+                }
+            }
+            matches.extend(rest);
+            return matches;
+        }
+    }
+    all
 }
 
 /// Case-insensitive lookup across built-ins, theme files and inline themes.
