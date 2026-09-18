@@ -497,31 +497,34 @@ pub fn render_lines(info: &SystemInfo, style: &RenderStyle) -> Vec<String> {
     let is_img = crate::kitty::is_image_path(logo_str);
     let terminal_is_kitty = crate::kitty::supports_kitty_graphics();
 
-    if !style.no_color
+    let maybe_img = if !style.no_color
         && (is_kitty_requested
             || (is_img
                 && (terminal_is_kitty
                     || style.logo_type.is_none()
                     || style.logo_type.as_deref() == Some("auto"))))
     {
-        let expanded = crate::config::expand_tilde(logo_str);
-        if expanded.exists() {
-            let direct = style.logo_type.as_deref() == Some("kitty-direct");
-            let icat = style.logo_type.as_deref() == Some("kitty-icat");
-            let kitty_opts = crate::kitty::KittyImageOptions {
-                req_w: style.logo_width,
-                req_h: style.logo_height,
-                padding_top: style.padding_top,
-                padding_left: style.padding_left,
-                padding_right: style.padding_right,
-                direct,
-                icat,
-            };
-            if let Ok(lines) =
-                crate::kitty::render_kitty_image_lines(&expanded, &kitty_opts, &module_lines)
-            {
-                return lines;
-            }
+        crate::kitty::resolve_image_path(logo_str)
+    } else {
+        None
+    };
+
+    if let Some(img_path) = maybe_img {
+        let direct = style.logo_type.as_deref() == Some("kitty-direct");
+        let icat = style.logo_type.as_deref() == Some("kitty-icat");
+        let kitty_opts = crate::kitty::KittyImageOptions {
+            req_w: style.logo_width,
+            req_h: style.logo_height,
+            padding_top: style.padding_top,
+            padding_left: style.padding_left,
+            padding_right: style.padding_right,
+            direct,
+            icat,
+        };
+        if let Ok(lines) =
+            crate::kitty::render_kitty_image_lines(&img_path, &kitty_opts, &module_lines)
+        {
+            return lines;
         }
     }
 

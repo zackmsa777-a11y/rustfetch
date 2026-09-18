@@ -20,6 +20,99 @@ pub struct Builtin {
 /// Ordered gallery shown by `rustfetch --setup`.
 const PRESETS: &[(&str, &str)] = &[
     (
+        "kitty-modern",
+        r##"{
+  "description": "kitty graphics image logo - sleek two-column modern card",
+  "logo": {
+    "source": "kitty:example",
+    "type": "kitty",
+    "width": 30,
+    "padding": { "top": 1, "left": 1, "right": 4 }
+  },
+  "separator": " \u2500 ",
+  "keys": "bright_cyan",
+  "value": "white",
+  "modules": [
+    "title",
+    "separator",
+    { "type": "os",       "key": "OS      ", "keyColor": "cyan" },
+    { "type": "host",     "key": "Host    ", "keyColor": "cyan" },
+    { "type": "kernel",   "key": "Kernel  ", "keyColor": "cyan" },
+    { "type": "uptime",   "key": "Uptime  ", "keyColor": "cyan" },
+    { "type": "packages", "key": "Packages", "keyColor": "cyan" },
+    { "type": "shell",    "key": "Shell   ", "keyColor": "cyan" },
+    { "type": "terminal", "key": "Terminal", "keyColor": "cyan" },
+    { "type": "cpu",      "key": "CPU     ", "keyColor": "cyan" },
+    { "type": "memory",   "key": "Memory  ", "keyColor": "cyan" },
+    { "type": "disk",     "key": "Disk    ", "keyColor": "cyan" },
+    "break",
+    "colors"
+  ]
+}"##,
+    ),
+    (
+        "kitty-card",
+        r##"{
+  "description": "kitty graphics image logo - boxed card frame with green accents",
+  "logo": {
+    "source": "kitty:example",
+    "type": "kitty",
+    "width": 32,
+    "padding": { "top": 2, "left": 1, "right": 5 }
+  },
+  "separator": " \u2502 ",
+  "keys": "bright_green",
+  "value": "white",
+  "modules": [
+    "break",
+    "title",
+    "separator",
+    { "type": "os",       "key": "system  ", "keyColor": "green" },
+    { "type": "kernel",   "key": "kernel  ", "keyColor": "green" },
+    { "type": "uptime",   "key": "uptime  ", "keyColor": "green" },
+    { "type": "packages", "key": "packages", "keyColor": "green" },
+    "break",
+    { "type": "wm",       "key": "desktop ", "keyColor": "bright_green" },
+    { "type": "terminal", "key": "terminal", "keyColor": "bright_green" },
+    { "type": "shell",    "key": "shell   ", "keyColor": "bright_green" },
+    "break",
+    { "type": "cpu",      "key": "cpu     ", "keyColor": "yellow" },
+    { "type": "memory",   "key": "memory  ", "keyColor": "yellow" },
+    { "type": "disk",     "key": "disk    ", "keyColor": "yellow" },
+    "break",
+    "colors"
+  ]
+}"##,
+    ),
+    (
+        "kitty-minimal",
+        r##"{
+  "description": "kitty graphics image logo - compact 4-letter rainbow metrics",
+  "logo": {
+    "source": "kitty:example",
+    "type": "kitty",
+    "width": 26,
+    "padding": { "top": 1, "left": 1, "right": 4 }
+  },
+  "separator": " \u203a ",
+  "title": "magenta",
+  "value": "white",
+  "modules": [
+    "break",
+    { "type": "os",       "key": "OS  ", "keyColor": "31" },
+    { "type": "kernel",   "key": "KER ", "keyColor": "32" },
+    { "type": "packages", "key": "PKG ", "keyColor": "33" },
+    { "type": "shell",    "key": "SH  ", "keyColor": "34" },
+    { "type": "terminal", "key": "TER ", "keyColor": "35" },
+    { "type": "cpu",      "key": "CPU ", "keyColor": "36" },
+    { "type": "memory",   "key": "MEM ", "keyColor": "36" },
+    { "type": "disk",     "key": "DSK ", "keyColor": "37" },
+    "break",
+    "colors"
+  ]
+}"##,
+    ),
+    (
         "default",
         r##"{
   "description": "classic rustfetch - distro logo, colon separator",

@@ -271,6 +271,22 @@ impl ThemeDef {
     pub fn has_layout(&self) -> bool {
         self.modules.is_some() || self.logo.is_some() || self.padding.is_some()
     }
+
+    pub fn logo_type(&self) -> Option<&str> {
+        self.logo.as_ref().and_then(|l| l.logo_type())
+    }
+
+    pub fn logo_source(&self) -> Option<&str> {
+        self.logo.as_ref().and_then(|l| l.source())
+    }
+
+    pub fn width(&self) -> Option<usize> {
+        self.logo.as_ref().and_then(|l| l.width())
+    }
+
+    pub fn height(&self) -> Option<usize> {
+        self.logo.as_ref().and_then(|l| l.height())
+    }
 }
 
 /// Accepts `"theme": "gruvbox"` shorthand or the full object form.

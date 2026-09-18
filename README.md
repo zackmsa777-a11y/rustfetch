@@ -111,24 +111,34 @@ rustfetch --setup
 rustfetch --themes
 ```
 
-The TUI provides an interactive split-pane interface:
-- **Left Pane**: Scrollable catalog of available themes. Distro-specific themes matching your current operating system are pinned at the top with a `rec` tag.
-- **Right Pane**: Instant real-time live preview of how your terminal will look with the selected theme, rendered using your actual hardware metrics.
+The TUI provides an interactive split-pane interface organized into curated visual categories:
+- **Category Tabs**: Filter themes instantly with `Tab` / `Shift+Tab`, number keys `1`..`7`, or direct mouse clicks on the top pill bar:
+  - `[1: All]` - Complete catalog of all 50+ themes and rices.
+  - `[2: Recommended]` - Distro-specific themes tailored to your detected operating system.
+  - `[3: Kitty/Images]` - High-resolution image logo presets using the Kitty Graphics Protocol.
+  - `[4: Layouts]` - Tree branches, cards, dense blocks, prompt rices, CRT, and matrix styles.
+  - `[5: Distros]` - Dedicated rices for Ubuntu, Arch, CachyOS, Gentoo, Bedrock, Fedora, Debian, NixOS, Mint, etc.
+  - `[6: Palettes]` - Iconic color schemes (Catppuccin Mocha/Macchiato, Tokyo Night, Dracula, Nord, Gruvbox, Everforest, etc.).
+  - `[7: Mascot Art]` - Ferris the Rust crab and Tux the Linux penguin.
+- **Left Pane**: Categorized theme catalog grouped with clear section headers and item counts (`── Section (count) ──`).
+- **Right Pane**: Instant real-time live preview rendered using your actual hardware metrics. For Kitty image presets, displays a dedicated image card preview detailing dimensions, cell footprint, protocol, and aspect metrics.
 
 ### Controls & Mouse Navigation
 
 | Input | Action |
 | :--- | :--- |
-| **`Mouse Click`** | Click any theme in the list to select and preview it; click footer buttons to Apply, Export, or Quit |
-| **`Mouse Scroll`** | Scroll wheel up / down through the theme catalog |
-| **`↑` / `k`** or **`↓` / `j`** | Navigate up / down one theme |
+| **`Tab` / `Shift+Tab`** | Cycle through category filter tabs |
+| **`1` .. `7`** | Jump directly to category tab (1: All, 2: Rec, 3: Kitty, 4: Layouts, 5: Distros, 6: Palettes, 7: Mascots) |
+| **`Mouse Click`** | Click category tab pills to filter; click themes to select; click footer buttons to Apply, Export, or Quit |
+| **`Mouse Scroll`** | Scroll wheel up / down through the active theme list |
+| **`↑` / `k`** or **`↓` / `j`** | Move selection up / down one theme (smoothly steps over section headers) |
 | **`PageUp`** / **`PageDown`** | Jump 5 themes up / down |
-| **`Home` / `g`** or **`End` / `G`** | Jump to top / bottom of catalog |
+| **`Home` / `g`** or **`End` / `G`** | Jump to first / last theme in current category |
 | **`Enter`** | **Apply & Save** selected theme to `~/.config/rustfetch/config.jsonc` |
 | **`e`** | **Export** theme to `~/.config/rustfetch/config.jsonc` as a custom theme |
-| **`q`** / **`Esc`** / **`Ctrl+C`** | Exit without saving changes |
+| **`q`** / **`Esc`** / **`Ctrl+C`** | Exit setup without saving changes |
 
-> **Non-Interactive Fallback**: When stdout/stdin is redirected or not a TTY (e.g. piped or automated), `rustfetch --setup` gracefully falls back to a clean numbered command-line prompt.
+> **Non-Interactive Fallback**: When stdout/stdin is redirected or not a TTY (e.g. piped or automated), `rustfetch --setup` gracefully falls back to a clean numbered command-line prompt organized by section.
 
 ---
 
@@ -452,22 +462,37 @@ rustfetch --gen-config > ~/.config/rustfetch/config.jsonc
 }
 ```
 
-### Kitty Image Logo Configuration
+### Kitty Graphics & Image Themes
 
-To render a high-resolution image logo in Kitty, Ghostty, or WezTerm via `config.jsonc`:
+`rustfetch` includes out-of-the-box Kitty image presets that work immediately:
+
+```bash
+# Sleek modern 2-column card with bundled/detected image logo
+rustfetch --theme kitty-modern
+
+# Boxed card frame with green accents
+rustfetch --theme kitty-card
+
+# Minimal compact 4-letter metrics
+rustfetch --theme kitty-minimal
+
+# Or pass your own image directly
+rustfetch --kitty ~/Pictures/avatar.png
+```
+
+To configure a high-resolution image logo permanently in `~/.config/rustfetch/config.jsonc`:
 
 ```jsonc
 {
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
   "logo": {
-    "source": "~/Pictures/avatar.png",
+    "source": "~/Pictures/avatar.png", // or "kitty:example" for bundled sample
     "type": "kitty",
-    "width": 32,
-    "height": 16,
+    "width": 30,
     "padding": {
       "top": 1,
       "left": 1,
-      "right": 3
+      "right": 4
     }
   }
 }

@@ -40,9 +40,79 @@ pub fn supports_kitty_graphics() -> bool {
     false
 }
 
+pub const DEFAULT_SAMPLE_PNG: &[u8] = include_bytes!("../assets/example-kitty.png");
+
+/// Ensure a sample Kitty image exists on disk and return its path.
+pub fn ensure_sample_image() -> Option<std::path::PathBuf> {
+    let local = Path::new("assets/example-kitty.png");
+    if local.is_file() {
+        return Some(local.to_path_buf());
+    }
+
+    if let Ok(home) = env::var("HOME") {
+        let user_cfg = Path::new(&home).join(".config/rustfetch/logo.png");
+        if user_cfg.is_file() {
+            return Some(user_cfg);
+        }
+        let sample = Path::new(&home).join(".config/rustfetch/example-kitty.png");
+        if sample.is_file() {
+            return Some(sample);
+        }
+    }
+
+    for p in &[
+        "/usr/share/pixmaps/ubuntu-logo-text.png",
+        "/usr/share/pixmaps/ubuntu-logo-text-dark.png",
+        "/usr/share/pixmaps/debian-logo.png",
+        "/usr/share/pixmaps/archlinux-logo.png",
+        "/usr/share/pixmaps/fedora-logo.png",
+    ] {
+        let pb = Path::new(p);
+        if pb.is_file() {
+            return Some(pb.to_path_buf());
+        }
+    }
+
+    let target = env::var("HOME")
+        .map(|h| Path::new(&h).join(".config/rustfetch/example-kitty.png"))
+        .unwrap_or_else(|_| env::temp_dir().join("rustfetch-example-kitty.png"));
+
+    if let Some(parent) = target.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if fs::write(&target, DEFAULT_SAMPLE_PNG).is_ok() {
+        return Some(target);
+    }
+
+    None
+}
+
+/// Resolve an image logo path, expanding special aliases like `kitty:example` or `auto`.
+pub fn resolve_image_path(path_str: &str) -> Option<std::path::PathBuf> {
+    let trimmed = path_str.trim();
+    if trimmed.is_empty() || trimmed == "none" {
+        return None;
+    }
+
+    if trimmed == "kitty:example"
+        || trimmed == "kitty:sample"
+        || trimmed == "kitty:default"
+        || trimmed == "kitty"
+        || trimmed == "auto"
+    {
+        return ensure_sample_image();
+    }
+
+    let p = crate::config::expand_tilde(trimmed);
+    if p.is_file() { Some(p) } else { None }
+}
+
 /// Check if a path looks like an image file based on extension or existence.
 pub fn is_image_path(path_str: &str) -> bool {
     let lower = path_str.to_lowercase();
+    if lower == "kitty:example" || lower == "kitty:sample" || lower == "kitty:default" {
+        return true;
+    }
     if lower.ends_with(".png")
         || lower.ends_with(".jpg")
         || lower.ends_with(".jpeg")
@@ -425,5 +495,13 @@ mod tests {
         let (w, h) = calculate_cell_dimensions(None, Some(40), Some(20));
         assert_eq!(w, 40);
         assert_eq!(h, 20);
+    }
+
+    #[test]
+    fn test_resolve_image_path() {
+        let sample = resolve_image_path("kitty:example");
+        assert!(sample.is_some());
+        let path = sample.unwrap();
+        assert!(path.exists());
     }
 }
