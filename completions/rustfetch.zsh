@@ -19,6 +19,7 @@ _rustfetch() {
         '--logo-padding-right[Right padding spaces]:num:'
         '--logo-padding-top[Top padding lines]:num:'
         '--no-logo[Hide the ASCII distro logo]'
+        '(-f --fast)'{-f,--fast}'[Minimal sfetch-like profile]'
         '--no-color[Disable ANSI terminal colors]'
         '--color[Color output mode]:mode:(always auto never)'
         '--structure[Colon or comma-separated modules]:modules:'
@@ -50,4 +51,4 @@ _rustfetch() {
 }
 
 _rustfetch "$@"
-# flags: --logo --logo-color --logo-type --kitty --kitty-direct --kitty-icat --sixel --iterm --logo-width --logo-height --logo-padding --logo-padding-left --logo-padding-right --logo-padding-top --no-logo --no-color --color --structure --disk-paths --config --gen-config --import-fastfetch --force --dry-run --list-logos --list-modules --list-themes --theme --set-theme --preview-themes --setup --themes --theme-picker --tui --json --show-empty --completions -h --help -v --version
+# flags: --logo --logo-color --logo-type --kitty --kitty-direct --kitty-icat --sixel --iterm --logo-width --logo-height --logo-padding --logo-padding-left --logo-padding-right --logo-padding-top --no-logo -f --fast --no-color --color --structure --disk-paths --config --gen-config --import-fastfetch --force --dry-run --list-logos --list-modules --list-themes --theme --set-theme --preview-themes --setup --themes --theme-picker --tui --json --show-empty --completions -h --help -v --version

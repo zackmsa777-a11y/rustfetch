@@ -12,7 +12,7 @@ pub fn generate(shell: &str) -> Result<String, String> {
 fn flag_list() -> &'static str {
     "--logo --logo-color --logo-type --kitty --kitty-direct --kitty-icat --sixel --iterm \
 --logo-width --logo-height --logo-padding --logo-padding-left --logo-padding-right \
---logo-padding-top --no-logo --no-color --color --structure --disk-paths --config \
+--logo-padding-top --no-logo -f --fast --no-color --color --structure --disk-paths --config \
 --gen-config --import-fastfetch --force --dry-run --list-logos --list-modules \
 --list-themes --theme --set-theme --preview-themes --setup --themes --theme-picker \
 --tui --json --show-empty --completions -h --help -v --version"
@@ -95,6 +95,7 @@ _rustfetch() {{
         '--logo-padding-right[Right padding spaces]:num:'
         '--logo-padding-top[Top padding lines]:num:'
         '--no-logo[Hide the ASCII distro logo]'
+        '(-f --fast)'{{-f,--fast}}'[Minimal sfetch-like profile]'
         '--no-color[Disable ANSI terminal colors]'
         '--color[Color output mode]:mode:(always auto never)'
         '--structure[Colon or comma-separated modules]:modules:'
@@ -152,6 +153,7 @@ complete -c rustfetch -l logo-padding-left -d 'Left padding spaces' -r
 complete -c rustfetch -l logo-padding-right -d 'Right padding spaces' -r
 complete -c rustfetch -l logo-padding-top -d 'Top padding lines' -r
 complete -c rustfetch -l no-logo -d 'Hide the ASCII distro logo'
+complete -c rustfetch -s f -l fast -d 'Minimal sfetch-like profile'
 complete -c rustfetch -l no-color -d 'Disable ANSI terminal colors'
 complete -c rustfetch -l color -d 'Color output mode' -r -a 'always auto never'
 complete -c rustfetch -l structure -d 'Colon or comma-separated modules' -r

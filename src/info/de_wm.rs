@@ -80,7 +80,7 @@ pub fn detect_de_wm() -> DesktopInfo {
     }
 }
 
-fn detect_wm() -> Option<String> {
+pub fn detect_wm() -> Option<String> {
     let wm_candidates = [
         ("Hyprland", "hyprland"),
         ("Sway", "sway"),

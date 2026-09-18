@@ -39,7 +39,7 @@ _rustfetch() {
     esac
 
     if [[ "${cur}" == -* ]]; then
-        COMPREPLY=( $(compgen -W "--logo --logo-color --logo-type --kitty --kitty-direct --kitty-icat --sixel --iterm --logo-width --logo-height --logo-padding --logo-padding-left --logo-padding-right --logo-padding-top --no-logo --no-color --color --structure --disk-paths --config --gen-config --import-fastfetch --force --dry-run --list-logos --list-modules --list-themes --theme --set-theme --preview-themes --setup --themes --theme-picker --tui --json --show-empty --completions -h --help -v --version" -- "${cur}") )
+        COMPREPLY=( $(compgen -W "--logo --logo-color --logo-type --kitty --kitty-direct --kitty-icat --sixel --iterm --logo-width --logo-height --logo-padding --logo-padding-left --logo-padding-right --logo-padding-top --no-logo -f --fast --no-color --color --structure --disk-paths --config --gen-config --import-fastfetch --force --dry-run --list-logos --list-modules --list-themes --theme --set-theme --preview-themes --setup --themes --theme-picker --tui --json --show-empty --completions -h --help -v --version" -- "${cur}") )
         return 0
     fi
 }
