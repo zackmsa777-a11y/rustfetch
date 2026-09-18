@@ -509,5 +509,65 @@ mod tests {
         let debian_themes = config::all_themes_for_distro(&cfg, Some("debian"));
         assert!(debian_themes[0].matches_distro("debian"));
         assert_eq!(debian_themes[0].name, "debian-swirl");
+
+        // On Bedrock: Bedrock themes must appear at the top
+        let bedrock_themes = config::all_themes_for_distro(&cfg, Some("bedrock"));
+        assert!(bedrock_themes[0].matches_distro("bedrock"));
+        assert_eq!(bedrock_themes[0].name, "bedrock-strata");
+
+        // On Gentoo: Gentoo themes must appear at the top
+        let gentoo_themes = config::all_themes_for_distro(&cfg, Some("gentoo"));
+        assert!(gentoo_themes[0].matches_distro("gentoo"));
+        assert_eq!(gentoo_themes[0].name, "gentoo-purple");
+
+        // On CachyOS: CachyOS themes must appear at the top
+        let cachyos_themes = config::all_themes_for_distro(&cfg, Some("cachyos"));
+        assert!(cachyos_themes[0].matches_distro("cachyos"));
+        assert_eq!(cachyos_themes[0].name, "cachyos-speed");
+
+        // On Linux Mint: Mint themes must appear at the top
+        let mint_themes = config::all_themes_for_distro(&cfg, Some("mint"));
+        assert!(mint_themes[0].matches_distro("mint"));
+        assert_eq!(mint_themes[0].name, "mint-fresh");
+
+        // On openSUSE: openSUSE themes must appear at the top
+        let opensuse_themes = config::all_themes_for_distro(&cfg, Some("opensuse"));
+        assert!(opensuse_themes[0].matches_distro("opensuse"));
+        assert_eq!(opensuse_themes[0].name, "opensuse-geek");
+
+        // On Pop!_OS: Pop themes must appear at the top
+        let pop_themes = config::all_themes_for_distro(&cfg, Some("pop"));
+        assert!(pop_themes[0].matches_distro("pop"));
+        assert_eq!(pop_themes[0].name, "pop-cosmic");
+
+        // On Void: Void themes must appear at the top
+        let void_themes = config::all_themes_for_distro(&cfg, Some("void"));
+        assert!(void_themes[0].matches_distro("void"));
+        assert_eq!(void_themes[0].name, "void-xbps");
+
+        // On Alpine: Alpine themes must appear at the top
+        let alpine_themes = config::all_themes_for_distro(&cfg, Some("alpine"));
+        assert!(alpine_themes[0].matches_distro("alpine"));
+        assert_eq!(alpine_themes[0].name, "alpine-peak");
+
+        // On Manjaro: Manjaro themes must appear at the top
+        let manjaro_themes = config::all_themes_for_distro(&cfg, Some("manjaro"));
+        assert!(manjaro_themes[0].matches_distro("manjaro"));
+        assert_eq!(manjaro_themes[0].name, "manjaro-teal");
+
+        // On Kali: Kali themes must appear at the top
+        let kali_themes = config::all_themes_for_distro(&cfg, Some("kali"));
+        assert!(kali_themes[0].matches_distro("kali"));
+        assert_eq!(kali_themes[0].name, "kali-dragon");
+
+        // On EndeavourOS: EndeavourOS themes must appear at the top
+        let endeavour_themes = config::all_themes_for_distro(&cfg, Some("endeavouros"));
+        assert!(endeavour_themes[0].matches_distro("endeavouros"));
+        assert_eq!(endeavour_themes[0].name, "endeavour-space");
+
+        // On Red Hat: Red Hat themes must appear at the top
+        let redhat_themes = config::all_themes_for_distro(&cfg, Some("redhat"));
+        assert!(redhat_themes[0].matches_distro("redhat"));
+        assert_eq!(redhat_themes[0].name, "redhat-shadow");
     }
 }

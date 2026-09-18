@@ -41,6 +41,31 @@ pub const BEDROCK_LOGO: &[&str] = &[
     "--------------------------------------",
 ];
 
+pub const CACHYOS_LOGO: &[&str] = &[
+    "           .-------------------------:",
+    "          .+=========================.",
+    "         :++===++==================-       :++-",
+    "        :*++====+++++=============-        .==:",
+    "       -*+++=====+***++==========:",
+    "      =*++++========------------:",
+    "     =*+++++=====-                     ...",
+    "   .+*+++++=-===:                    .=+++=:",
+    "  :++++=====-==:                     -*****+",
+    " :++========-=.                      .=+**+.",
+    ".+==========-.                          .",
+    " :+++++++====-                                .--==-.",
+    "  :++==========.                             :+++++++:",
+    "   .-===========.                            =*****+*+",
+    "    .-===========:                           .+*****+:",
+    "      -=======++++:::::::::::::::::::::::::-:  .---:",
+    "       :======++++====+++******************=.",
+    "        :=====+++==========++++++++++++++*-",
+    "         .====++==============++++++++++*-",
+    "          .===+==================+++++++:",
+    "           .-=======================+++:",
+    "             ..........................",
+];
+
 pub const DEBIAN_LOGO: &[&str] = &[
     "       _,met$$$$$gg.",
     "    ,g$$$$$$$$$$$$$$$P.",
@@ -551,6 +576,7 @@ pub const ALL_LOGOS: &[&str] = &[
     "arch",
     "artix",
     "bedrock",
+    "cachyos",
     "centos",
     "debian",
     "devuan",
@@ -639,6 +665,7 @@ pub fn logo_art(name: &str) -> (&'static [&'static str], &'static str) {
         "windows" | "win" => (WINDOWS_LOGO, "\x1b[1;36m"),
         "android" => (ANDROID_LOGO, "\x1b[1;32m"),
         "bedrock" | "bedrocklinux" => (BEDROCK_LOGO, "\x1b[1;37m"),
+        "cachyos" | "cachy" => (CACHYOS_LOGO, "\x1b[1;36m"),
         "rust" | "ferris" => (RUST_LOGO, "\x1b[1;31m"),
         _ => (LINUX_LOGO, "\x1b[1;33m"),
     }
@@ -683,4 +710,28 @@ pub fn get_logo(
         .collect();
 
     (lines, default_col)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_all_logos_present_and_resolvable() {
+        for name in ALL_LOGOS {
+            let (art, col) = logo_art(name);
+            assert!(!art.is_empty(), "Logo '{name}' has empty art");
+            assert!(!col.is_empty(), "Logo '{name}' has empty color");
+        }
+    }
+
+    #[test]
+    fn test_specific_distro_logos() {
+        let (bedrock, _) = logo_art("bedrock");
+        assert!(!bedrock.is_empty());
+        let (gentoo, _) = logo_art("gentoo");
+        assert!(!gentoo.is_empty());
+        let (cachyos, _) = logo_art("cachyos");
+        assert!(!cachyos.is_empty());
+    }
 }

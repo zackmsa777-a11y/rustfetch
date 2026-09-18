@@ -42,11 +42,14 @@ pub fn detect_os() -> (Option<String>, String, String) {
             "elementaryos" => "elementary",
             "mxlinux" => "mx",
             "bedrock" | "bedrocklinux" => "bedrock",
+            "cachyos" | "cachy" => "cachyos",
             known => known,
         }
         .to_string()
     } else if !bedrock_restricted && Path::new("/bedrock/etc/bedrock-release").exists() {
         "bedrock".to_string()
+    } else if Path::new("/etc/cachyos-release").exists() {
+        "cachyos".to_string()
     } else if Path::new("/etc/arch-release").exists() {
         "arch".to_string()
     } else if Path::new("/etc/debian_version").exists() {
@@ -113,6 +116,10 @@ pub fn detect_os() -> (Option<String>, String, String) {
         })
         .unwrap_or(if normalized_id == "bedrock" {
             "Bedrock Linux"
+        } else if normalized_id == "cachyos" {
+            "CachyOS"
+        } else if normalized_id == "gentoo" {
+            "Gentoo Linux"
         } else {
             normalized_id.as_str()
         })
