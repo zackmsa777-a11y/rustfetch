@@ -1,0 +1,4 @@
+version=4
+opts=filenamemangle=s/.+\/v?(\d\S+)\.tar\.gz/rustftechh-$1.tar.gz/ \
+  https://github.com/zackmsa777-a11y/rustfetch/tags \
+  .*/refs/tags/v?(\d[\d\.]*)\.tar\.gz

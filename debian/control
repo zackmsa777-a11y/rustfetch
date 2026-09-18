@@ -1,0 +1,27 @@
+Source: rustftechh
+Section: utils
+Priority: optional
+Maintainer: Zack <zackmsa777-a11y@users.noreply.github.com>
+Uploaders: Zack <zackmsa777-a11y@users.noreply.github.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ cargo,
+ rustc,
+ libstd-rust-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/zackmsa777-a11y/rustfetch
+Vcs-Git: https://github.com/zackmsa777-a11y/rustfetch.git
+Vcs-Browser: https://github.com/zackmsa777-a11y/rustfetch
+Rules-Requires-Root: no
+
+Package: rustftechh
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Provides: rustfetch
+Description: blazingly fast system information fetch tool (rustfetch)
+ rustftechh installs the rustfetch binary — a fast, extensible system
+ information tool written in Rust with fastfetch-style logos and probes.
+ .
+ The Debian/Ubuntu package name is rustftechh (matching crates.io) so it
+ does not collide with other projects named rustfetch. The command installed
+ on PATH is rustfetch (/usr/bin/rustfetch).

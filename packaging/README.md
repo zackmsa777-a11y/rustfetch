@@ -27,6 +27,7 @@ cargo install rustftechh --locked   # installs ~/.cargo/bin/rustfetch
 | `aur/PKGBUILD` + `aur/.SRCINFO` | Arch User Repository (`pkgname=rustftechh`, binary `/usr/bin/rustfetch`) |
 | `scoop/rustftechh.json` | Scoop bucket manifest (`bin`: `rustfetch.exe`) |
 | `../flake.nix` + `nix/default.nix` + `nix/nixpkgs.nix` | Root flake, source package, nixpkgs `fetchCrate` stub |
+| `apt/` + `/debian` | Debian/Ubuntu `.deb` (`rustftechh`, binary `/usr/bin/rustfetch`) |
 
 ## Maintainer submit steps
 
@@ -64,5 +65,13 @@ nix build .#rustfetch   # from a checkout
 `packaging/nix/default.nix` builds from source via `cargoLock.lockFile` → repo `Cargo.lock`.
 For a nixpkgs PR, copy `packaging/nix/nixpkgs.nix` to `pkgs/by-name/ru/rustfetch/package.nix`
 (see `packaging/nix/README.md`).
+
+
+### Debian / Ubuntu / Mint (.deb)
+
+1. Build locally: `./packaging/apt/build-deb.sh` → `packaging/apt/out/rustftechh_*.deb`.
+2. Or download the `.deb` from GitHub Releases (CI workflow / template in `apt/deb.yml.template`).
+3. Users: `sudo apt install ./rustftechh_*.deb` → `/usr/bin/rustfetch`.
+4. Not in Debian/Ubuntu archives yet — see `apt/README.md` for ITP / mentors notes.
 
 Release binaries are produced by `.github/workflows/release.yml` on tags matching `v*`.
