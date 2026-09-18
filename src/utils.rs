@@ -8,16 +8,40 @@ pub fn clean(input: &str) -> String {
 
 pub fn strip_ansi(s: &str) -> String {
     let mut out = String::new();
-    let mut in_escape = false;
-    for c in s.chars() {
-        if in_escape {
-            if c.is_ascii_alphabetic() {
-                in_escape = false;
+    let chars: Vec<char> = s.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+
+    while i < len {
+        if chars[i] == '\x1b' {
+            if i + 1 < len && (chars[i + 1] == '_' || chars[i + 1] == ']' || chars[i + 1] == 'P') {
+                i += 2;
+                while i < len {
+                    if chars[i] == '\x07' {
+                        i += 1;
+                        break;
+                    }
+                    if chars[i] == '\x1b' && i + 1 < len && chars[i + 1] == '\\' {
+                        i += 2;
+                        break;
+                    }
+                    i += 1;
+                }
+            } else if i + 1 < len && chars[i + 1] == '[' {
+                i += 2;
+                while i < len {
+                    let c = chars[i];
+                    i += 1;
+                    if (c as u32) >= 0x40 && (c as u32) <= 0x7E {
+                        break;
+                    }
+                }
+            } else {
+                i += 2;
             }
-        } else if c == '\x1b' {
-            in_escape = true;
         } else {
-            out.push(c);
+            out.push(chars[i]);
+            i += 1;
         }
     }
     out
@@ -101,5 +125,20 @@ mod tests {
         assert_eq!(lines, vec!["line one", "line two"]);
 
         std::fs::remove_file(&script).ok();
+    }
+
+    #[test]
+    fn test_strip_ansi_comprehensive() {
+        let plain = "Hello, World!";
+        assert_eq!(strip_ansi(plain), "Hello, World!");
+
+        let colored = "\x1b[1;32mGreen\x1b[0m and \x1b[38;5;208mOrange\x1b[0m";
+        assert_eq!(strip_ansi(colored), "Green and Orange");
+
+        let kitty_escape = "\x1b_Ga=T,f=100,t=f;L3BhdGgvdG8vaW1hZ2U=\x1b\\Text after image";
+        assert_eq!(strip_ansi(kitty_escape), "Text after image");
+
+        let mixed = "\x1b[10C\x1b_Ga=T;b64\x1b\\\x1b[31mRed Text\x1b[0m";
+        assert_eq!(strip_ansi(mixed), "Red Text");
     }
 }

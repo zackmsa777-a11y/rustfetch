@@ -1,15 +1,19 @@
+mod art;
+mod banner;
 mod cli;
 mod config;
 mod info;
+mod kitty;
 mod logos;
+mod presets;
 mod printer;
+mod tui;
 mod utils;
 
 use cli::{parse_cli, print_help, print_modules};
 use config::{generate_default_config, load_config};
 use info::gather_info;
 use logos::ALL_LOGOS;
-use printer::{PrintOptions, print_fetch};
 use std::env;
 
 fn main() {
@@ -50,10 +54,32 @@ fn main() {
         return;
     }
 
-    let file_cfg = load_config(cli_opts.config_path.as_deref());
+    let mut file_cfg = load_config(cli_opts.config_path.as_deref());
+
+    if cli_opts.list_themes {
+        let (_, distro_id, distro_name) = crate::info::os::detect_os();
+        let themes = config::all_themes_for_distro(&file_cfg, Some(&distro_id));
+        if !distro_name.is_empty() {
+            println!("Available rustfetch themes (detected: {distro_name}):");
+        } else {
+            println!("Available rustfetch themes:");
+        }
+        for entry in themes {
+            let rec = if entry.matches_distro(&distro_id) {
+                " \x1b[1;32m[recommended]\x1b[0m"
+            } else {
+                ""
+            };
+            println!("  - {}{rec}", tui::describe(&entry.name, &entry.def));
+        }
+        println!(
+            "\nCustom themes: add .jsonc files to ~/.config/rustfetch/themes/ or define in config."
+        );
+        println!("Run `rustfetch --setup` to launch the interactive full-screen setup gallery.");
+        return;
+    }
 
     let cfg_logo_name = file_cfg.get_logo_name();
-    let cfg_logo_color = file_cfg.get_logo_color();
     let cfg_modules = file_cfg.get_normalized_modules();
 
     let effective_no_color = cli_opts.no_color || file_cfg.no_color.unwrap_or(false);
@@ -62,10 +88,6 @@ fn main() {
         .logo
         .as_deref()
         .or_else(|| cfg_logo_name.as_deref().filter(|s| *s != "auto"));
-    let effective_logo_color = cli_opts
-        .logo_color
-        .as_deref()
-        .or_else(|| cfg_logo_color.as_deref().filter(|s| *s != "auto"));
     let effective_structure = cli_opts.structure.as_ref().or(cfg_modules.as_ref());
 
     let effective_disks = cli_opts
@@ -75,25 +97,161 @@ fn main() {
 
     let system_info = gather_info(effective_disks.map(|v| v.as_slice()));
 
+    if cli_opts.preview_themes {
+        tui::preview_all(
+            &system_info,
+            &file_cfg,
+            effective_no_color,
+            effective_no_logo,
+            effective_logo,
+        );
+        return;
+    }
+
+    if cli_opts.theme_picker {
+        if let Err(e) = tui::run_picker(
+            &system_info,
+            &file_cfg,
+            cli_opts.config_path.as_deref(),
+            effective_no_logo,
+            effective_logo,
+        ) {
+            eprintln!("error: {e}");
+            std::process::exit(1);
+        }
+        return;
+    }
+
+    // `--set-theme` persists first, then renders with the new theme below.
+    if let Some(name) = cli_opts.set_theme.clone() {
+        if config::lookup_theme(&file_cfg, &name).is_none() {
+            eprintln!("error: unknown theme '{name}' (see --list-themes)");
+            std::process::exit(1);
+        }
+        match config::save_theme_name(cli_opts.config_path.as_deref(), &name) {
+            Ok(saved) => {
+                eprintln!("Saved theme '{name}' to {}", saved.display());
+                file_cfg = load_config(cli_opts.config_path.as_deref());
+            }
+            Err(e) => {
+                eprintln!("error saving theme: {e}");
+                std::process::exit(1);
+            }
+        }
+    }
+
+    if let Some(name) = cli_opts.theme.as_deref()
+        && config::lookup_theme(&file_cfg, name).is_none()
+    {
+        eprintln!("error: unknown theme '{name}' (see --list-themes)");
+        std::process::exit(1);
+    }
+
+    // Theme resolution order: --theme flag > config theme (+ custom themes
+    // override built-in presets of the same name) > legacy display colors.
+    let resolved_entry = config::resolve_active_theme(&file_cfg, cli_opts.theme.as_deref());
+    let mut style = printer::style_from_theme(&resolved_entry.def);
+
+    if effective_no_color {
+        style.no_color = true;
+    }
+    if effective_no_logo {
+        style.no_logo = true;
+    }
+    if let Some(logo) = effective_logo {
+        style.logo = Some(logo.to_string());
+    }
     let cfg_key_color = file_cfg.get_key_color();
+    if let Some(ref kcol) = cfg_key_color
+        && style.key_color.is_none()
+    {
+        style.key_color = Some(kcol.clone());
+    }
+    let cfg_logo_color = file_cfg.get_logo_color();
+    let effective_logo_color = cli_opts
+        .logo_color
+        .as_deref()
+        .or(style.logo_color.as_deref())
+        .or_else(|| cfg_logo_color.as_deref().filter(|s| *s != "auto"));
+    if let Some(lcol) = effective_logo_color {
+        style.logo_color = Some(lcol.to_string());
+    }
 
-    let print_opts = PrintOptions {
-        no_color: effective_no_color,
-        no_logo: effective_no_logo,
-        logo_override: effective_logo,
-        logo_color: effective_logo_color,
-        key_color: cfg_key_color.as_deref(),
-        structure: effective_structure.map(|v| v.as_slice()),
-        json: cli_opts.json,
-    };
+    let cfg_logo_type = file_cfg.get_logo_type();
+    let effective_logo_type = cli_opts
+        .logo_type
+        .clone()
+        .or(style.logo_type.clone())
+        .or(cfg_logo_type);
+    if let Some(t) = effective_logo_type {
+        style.logo_type = Some(t);
+    }
 
-    print_fetch(&system_info, &print_opts);
+    let cfg_logo_width = file_cfg.get_logo_width();
+    let effective_logo_width = cli_opts.logo_width.or(style.logo_width).or(cfg_logo_width);
+    if let Some(w) = effective_logo_width {
+        style.logo_width = Some(w);
+    }
+
+    let cfg_logo_height = file_cfg.get_logo_height();
+    let effective_logo_height = cli_opts
+        .logo_height
+        .or(style.logo_height)
+        .or(cfg_logo_height);
+    if let Some(h) = effective_logo_height {
+        style.logo_height = Some(h);
+    }
+
+    if let Some(p) = cli_opts.logo_padding_top {
+        style.padding_top = p;
+    }
+    if let Some(p) = cli_opts.logo_padding_left {
+        style.padding_left = p;
+    }
+    if let Some(p) = cli_opts.logo_padding_right {
+        style.padding_right = p;
+    } else if let Some(cfg_pad) = file_cfg.get_logo_padding() {
+        if cli_opts.logo_padding_top.is_none() && cfg_pad.top > 0 {
+            style.padding_top = cfg_pad.top;
+        }
+        if cli_opts.logo_padding_left.is_none() && cfg_pad.left > 0 {
+            style.padding_left = cfg_pad.left;
+        }
+        if cli_opts.logo_padding_right.is_none() && cfg_pad.right > 0 {
+            style.padding_right = cfg_pad.right;
+        }
+    }
+    if let Some(structure) = effective_structure {
+        style.modules = Some(
+            structure
+                .iter()
+                .map(|name| config::ModuleSpec {
+                    kind: config::normalize_module_name(name),
+                    ..Default::default()
+                })
+                .collect(),
+        );
+    }
+    if style.separator.is_none()
+        && let Some(d) = file_cfg.display.as_ref()
+        && let Some(ref s) = d.separator
+    {
+        style.separator = Some(s.clone());
+    }
+
+    if cli_opts.json {
+        if let Ok(serialized) = serde_json::to_string_pretty(&system_info) {
+            println!("{serialized}");
+        }
+    } else {
+        printer::print_fetch_styled(&system_info, &style);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::cli::parse_cli;
-    use crate::config::{Config, strip_jsonc_comments};
+    use crate::config::{Config, parse_color, resolve_theme, strip_jsonc_comments};
     use crate::info::cpu::format_cpu;
     use crate::info::memory::format_memory;
     use crate::info::swap::format_swap;
@@ -119,6 +277,26 @@ mod tests {
             opts.structure.unwrap(),
             vec!["title".to_string(), "os".to_string(), "kernel".to_string()]
         );
+    }
+
+    #[test]
+    fn parses_kitty_image_flags() {
+        let args = vec![
+            "--kitty".to_string(),
+            "/path/to/logo.png".to_string(),
+            "--logo-width".to_string(),
+            "35".to_string(),
+            "--logo-height".to_string(),
+            "18".to_string(),
+            "--logo-padding-left".to_string(),
+            "2".to_string(),
+        ];
+        let opts = parse_cli(&args).unwrap();
+        assert_eq!(opts.logo.as_deref(), Some("/path/to/logo.png"));
+        assert_eq!(opts.logo_type.as_deref(), Some("kitty"));
+        assert_eq!(opts.logo_width, Some(35));
+        assert_eq!(opts.logo_height, Some(18));
+        assert_eq!(opts.logo_padding_left, Some(2));
     }
 
     #[test]
@@ -203,11 +381,106 @@ mod tests {
     }
 
     #[test]
+    fn resolves_theme_presets_and_overrides() {
+        let neon = resolve_theme("neon").unwrap();
+        assert_eq!(neon.keys.as_deref(), Some("cyan"));
+        assert_eq!(neon.title.as_deref(), Some("magenta"));
+        assert_eq!(neon.value.as_deref(), Some("white"));
+
+        let default = resolve_theme("default").unwrap();
+        assert!(default.keys.is_none() && default.title.is_none());
+
+        assert!(resolve_theme("nonexistent").is_none());
+        assert_eq!(
+            resolve_theme("Dracula").unwrap().keys.as_deref(),
+            Some("141")
+        );
+    }
+
+    #[test]
+    fn parses_color_formats() {
+        assert_eq!(parse_color("cyan"), Some("\x1b[1;36m".to_string()));
+        assert_eq!(parse_color("208"), Some("\x1b[38;5;208m".to_string()));
+        assert_eq!(
+            parse_color("#7aa2f7"),
+            Some("\x1b[38;2;122;162;247m".to_string())
+        );
+        assert_eq!(
+            parse_color("7aa2f7"),
+            Some("\x1b[38;2;122;162;247m".to_string())
+        );
+        assert_eq!(parse_color("auto"), None);
+        assert_eq!(parse_color("999"), None);
+    }
+
+    #[test]
+    fn parses_theme_config_with_overrides() {
+        let json_str = r##"{
+            "theme": {
+                "name": "nord",
+                "title": "#bf616a",
+                "separator": " -> "
+            }
+        }"##;
+        let cfg: Config = serde_json::from_str(json_str).unwrap();
+        let theme = cfg.theme.unwrap();
+        assert_eq!(theme.name(), Some("nord"));
+        let over = theme.overrides();
+        assert_eq!(over.title.as_deref(), Some("#bf616a"));
+        assert_eq!(over.separator.as_deref(), Some(" -> "));
+        assert!(over.keys.is_none());
+
+        let short: Config = serde_json::from_str(r#"{"theme": "gruvbox"}"#).unwrap();
+        assert_eq!(short.theme.as_ref().unwrap().name(), Some("gruvbox"));
+
+        let custom: Config = serde_json::from_str(
+            r#"{"themes": {"my-theme": {"keys": "cyan", "logo_color": "red"}}}"#,
+        )
+        .unwrap();
+        let found = crate::config::lookup_theme(&custom, "my-theme").unwrap();
+        assert_eq!(found.keys.as_deref(), Some("cyan"));
+        assert_eq!(found.logo_color.as_deref(), Some("red"));
+        assert!(crate::config::all_theme_names(&custom).contains(&"my-theme".to_string()));
+    }
+
+    #[test]
     fn strips_jsonc_syntax() {
         let jsonc = "{\n\"key\": \"value\"\n}\n";
         let cleaned = strip_jsonc_comments(jsonc);
         let parsed: serde_json::Value = serde_json::from_str(&cleaned).unwrap();
         assert_eq!(parsed["key"], "value");
+    }
+
+    #[test]
+    fn theme_preview_lines_use_theme_colors() {
+        use crate::config::parse_color;
+        use crate::info::types::SystemInfo;
+        use crate::printer::format_module_lines;
+        let info = SystemInfo {
+            user: "user".into(),
+            hostname: "host".into(),
+            os: Some("TestOS 1.0 x86_64".into()),
+            ..Default::default()
+        };
+        let cfg: Config =
+            serde_json::from_str(r#"{"themes": {"testy": {"keys": "cyan", "separator": " => "}}}"#)
+                .unwrap();
+        let colors = crate::config::lookup_theme(&cfg, "testy").unwrap();
+        let key_ansi = colors.keys.as_deref().and_then(parse_color).unwrap();
+        let structure = vec!["os".to_string()];
+        let lines = format_module_lines(
+            &info,
+            false,
+            &key_ansi,
+            None,
+            colors.value.as_deref(),
+            colors.separator.as_deref(),
+            Some(&structure),
+        );
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("OS"));
+        assert!(lines[0].contains("=>"));
+        assert!(lines[0].contains("\x1b[1;36m"));
     }
 
     #[test]
@@ -264,5 +537,103 @@ mod tests {
 
         let (windows, _) = get_logo("windows", false, None);
         assert!(!windows.is_empty());
+    }
+
+    #[test]
+    fn resolves_custom_art_pieces() {
+        use crate::art;
+        assert!(art::art("ferris").is_some());
+        assert!(art::art("crab").is_some());
+        assert!(art::art("tux").is_some());
+        assert!(art::art("penguin").is_some());
+        assert!(art::art("ubuntu-mini").is_some());
+        assert!(art::art("coffee").is_some());
+        assert!(art::art("heart").is_some());
+        assert!(art::art("ghost").is_some());
+        assert!(art::art("arch-mini").is_some());
+    }
+
+    #[test]
+    fn distro_theme_prioritization() {
+        use crate::config;
+        let cfg = Config::default();
+
+        // On Ubuntu: Ubuntu themes must appear at the top
+        let ubuntu_themes = config::all_themes_for_distro(&cfg, Some("ubuntu"));
+        assert!(ubuntu_themes.len() > 5);
+        assert!(ubuntu_themes[0].matches_distro("ubuntu"));
+        assert!(ubuntu_themes[1].matches_distro("ubuntu"));
+        assert!(ubuntu_themes[2].matches_distro("ubuntu"));
+        assert!(ubuntu_themes[0].name.starts_with("ubuntu-"));
+
+        // On Arch: Arch themes must appear at the top
+        let arch_themes = config::all_themes_for_distro(&cfg, Some("arch"));
+        assert!(arch_themes[0].matches_distro("arch"));
+        assert_eq!(arch_themes[0].name, "arch-clean");
+
+        // On Debian: Debian themes must appear at the top
+        let debian_themes = config::all_themes_for_distro(&cfg, Some("debian"));
+        assert!(debian_themes[0].matches_distro("debian"));
+        assert_eq!(debian_themes[0].name, "debian-swirl");
+
+        // On Bedrock: Bedrock themes must appear at the top
+        let bedrock_themes = config::all_themes_for_distro(&cfg, Some("bedrock"));
+        assert!(bedrock_themes[0].matches_distro("bedrock"));
+        assert_eq!(bedrock_themes[0].name, "bedrock-strata");
+
+        // On Gentoo: Gentoo themes must appear at the top
+        let gentoo_themes = config::all_themes_for_distro(&cfg, Some("gentoo"));
+        assert!(gentoo_themes[0].matches_distro("gentoo"));
+        assert_eq!(gentoo_themes[0].name, "gentoo-purple");
+
+        // On CachyOS: CachyOS themes must appear at the top
+        let cachyos_themes = config::all_themes_for_distro(&cfg, Some("cachyos"));
+        assert!(cachyos_themes[0].matches_distro("cachyos"));
+        assert_eq!(cachyos_themes[0].name, "cachyos-speed");
+
+        // On Linux Mint: Mint themes must appear at the top
+        let mint_themes = config::all_themes_for_distro(&cfg, Some("mint"));
+        assert!(mint_themes[0].matches_distro("mint"));
+        assert_eq!(mint_themes[0].name, "mint-fresh");
+
+        // On openSUSE: openSUSE themes must appear at the top
+        let opensuse_themes = config::all_themes_for_distro(&cfg, Some("opensuse"));
+        assert!(opensuse_themes[0].matches_distro("opensuse"));
+        assert_eq!(opensuse_themes[0].name, "opensuse-geek");
+
+        // On Pop!_OS: Pop themes must appear at the top
+        let pop_themes = config::all_themes_for_distro(&cfg, Some("pop"));
+        assert!(pop_themes[0].matches_distro("pop"));
+        assert_eq!(pop_themes[0].name, "pop-cosmic");
+
+        // On Void: Void themes must appear at the top
+        let void_themes = config::all_themes_for_distro(&cfg, Some("void"));
+        assert!(void_themes[0].matches_distro("void"));
+        assert_eq!(void_themes[0].name, "void-xbps");
+
+        // On Alpine: Alpine themes must appear at the top
+        let alpine_themes = config::all_themes_for_distro(&cfg, Some("alpine"));
+        assert!(alpine_themes[0].matches_distro("alpine"));
+        assert_eq!(alpine_themes[0].name, "alpine-peak");
+
+        // On Manjaro: Manjaro themes must appear at the top
+        let manjaro_themes = config::all_themes_for_distro(&cfg, Some("manjaro"));
+        assert!(manjaro_themes[0].matches_distro("manjaro"));
+        assert_eq!(manjaro_themes[0].name, "manjaro-teal");
+
+        // On Kali: Kali themes must appear at the top
+        let kali_themes = config::all_themes_for_distro(&cfg, Some("kali"));
+        assert!(kali_themes[0].matches_distro("kali"));
+        assert_eq!(kali_themes[0].name, "kali-dragon");
+
+        // On EndeavourOS: EndeavourOS themes must appear at the top
+        let endeavour_themes = config::all_themes_for_distro(&cfg, Some("endeavouros"));
+        assert!(endeavour_themes[0].matches_distro("endeavouros"));
+        assert_eq!(endeavour_themes[0].name, "endeavour-space");
+
+        // On Red Hat: Red Hat themes must appear at the top
+        let redhat_themes = config::all_themes_for_distro(&cfg, Some("redhat"));
+        assert!(redhat_themes[0].matches_distro("redhat"));
+        assert_eq!(redhat_themes[0].name, "redhat-shadow");
     }
 }
