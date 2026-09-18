@@ -306,6 +306,7 @@ OPTIONS:
     --logo-padding-left <NUM>  Left padding spaces before the image
     --logo-padding-top <NUM>   Top padding empty lines before image and text
     --no-logo              Hide the ASCII distro logo
+    -f, --fast             Minimal sfetch-like profile (os/host/kernel/wm/terminal, builtin logo)
     --no-color             Disable ANSI terminal colors
     --color <MODE>         Color output mode (always, auto, never)
     --structure <LIST>     Colon or comma-separated list of modules to display
@@ -369,6 +370,9 @@ rustfetch --logo cachyos
 rustfetch --logo gentoo
 rustfetch --logo bedrock
 rustfetch --logo rust
+
+# Fast minimal profile (sfetch-like; ignores expensive modules)
+rustfetch --fast
 
 # Select custom modules and ordering
 rustfetch --structure title:os:kernel:cpu:gpu:memory:disk:colors

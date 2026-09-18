@@ -16,6 +16,7 @@ complete -c rustfetch -l logo-padding-left -d 'Left padding spaces' -r
 complete -c rustfetch -l logo-padding-right -d 'Right padding spaces' -r
 complete -c rustfetch -l logo-padding-top -d 'Top padding lines' -r
 complete -c rustfetch -l no-logo -d 'Hide the ASCII distro logo'
+complete -c rustfetch -s f -l fast -d 'Minimal sfetch-like profile'
 complete -c rustfetch -l no-color -d 'Disable ANSI terminal colors'
 complete -c rustfetch -l color -d 'Color output mode' -r -a 'always auto never'
 complete -c rustfetch -l structure -d 'Colon or comma-separated modules' -r
@@ -40,4 +41,4 @@ complete -c rustfetch -l show-empty -d 'Show info modules even when empty'
 complete -c rustfetch -l completions -d 'Print shell completion script' -r -a 'bash zsh fish'
 complete -c rustfetch -s h -l help -d 'Print help information'
 complete -c rustfetch -s v -l version -d 'Print version information'
-# flags: --logo --logo-color --logo-type --kitty --kitty-direct --kitty-icat --sixel --iterm --logo-width --logo-height --logo-padding --logo-padding-left --logo-padding-right --logo-padding-top --no-logo --no-color --color --structure --disk-paths --config --gen-config --import-fastfetch --force --dry-run --list-logos --list-modules --list-themes --theme --set-theme --preview-themes --setup --themes --theme-picker --tui --json --show-empty --completions -h --help -v --version
+# flags: --logo --logo-color --logo-type --kitty --kitty-direct --kitty-icat --sixel --iterm --logo-width --logo-height --logo-padding --logo-padding-left --logo-padding-right --logo-padding-top --no-logo -f --fast --no-color --color --structure --disk-paths --config --gen-config --import-fastfetch --force --dry-run --list-logos --list-modules --list-themes --theme --set-theme --preview-themes --setup --themes --theme-picker --tui --json --show-empty --completions -h --help -v --version

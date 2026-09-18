@@ -11,7 +11,7 @@ mod printer;
 mod tui;
 mod utils;
 
-use cli::{parse_cli, print_help, print_modules};
+use cli::{FAST_MODULES, parse_cli, print_help, print_modules};
 use config::{
     default_config_path_for_write, generate_default_config, import_fastfetch_from_path,
     load_config, write_imported_config,
@@ -177,7 +177,23 @@ fn main() {
         .as_ref()
         .or(file_cfg.disk_paths.as_ref());
 
-    let system_info = gather_info(effective_disks.map(|v| v.as_slice()));
+    let gather_only: Option<Vec<String>> = if cli_opts.structure.is_some() {
+        cli_opts.structure.clone()
+    } else if cli_opts.fast {
+        Some(FAST_MODULES.iter().map(|s| (*s).to_string()).collect())
+    } else {
+        None
+    };
+
+    let need_full = cli_opts.preview_themes || cli_opts.theme_picker;
+    let system_info = gather_info(
+        effective_disks.map(|v| v.as_slice()),
+        if need_full {
+            None
+        } else {
+            gather_only.as_deref()
+        },
+    );
 
     if cli_opts.preview_themes {
         tui::preview_all(
@@ -313,8 +329,22 @@ fn main() {
                 })
                 .collect(),
         );
+    } else if cli_opts.fast {
+        style.modules = Some(
+            FAST_MODULES
+                .iter()
+                .map(|name| config::ModuleSpec {
+                    kind: config::normalize_module_name(name),
+                    ..Default::default()
+                })
+                .collect(),
+        );
     } else if let Some(specs) = file_cfg.get_modules() {
         style.modules = Some(specs);
+    }
+
+    if cli_opts.fast && !effective_no_logo {
+        style.logo_type = Some("builtin".into());
     }
     if style.separator.is_none()
         && let Some(d) = file_cfg.display.as_ref()
@@ -423,6 +453,16 @@ mod tests {
     fn rejects_unknown_cli_arguments() {
         let args = vec!["--unknown-flag".to_string()];
         assert!(parse_cli(&args).is_err());
+    }
+
+    #[test]
+    fn parses_fast_flag() {
+        let opts = parse_cli(&["--fast".to_string()]).unwrap();
+        assert!(opts.fast);
+        let short = parse_cli(&["-f".to_string()]).unwrap();
+        assert!(short.fast);
+        let default = parse_cli(&[]).unwrap();
+        assert!(!default.fast);
     }
 
     #[test]

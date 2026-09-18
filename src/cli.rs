@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+pub const FAST_MODULES: &[&str] = &["os", "host", "kernel", "wm", "terminal"];
+
 #[derive(Debug, Clone, Default)]
 pub struct CliOptions {
     pub logo: Option<String>,
@@ -12,6 +14,7 @@ pub struct CliOptions {
     pub logo_padding_right: Option<usize>,
     pub no_logo: bool,
     pub no_color: bool,
+    pub fast: bool,
     pub structure: Option<Vec<String>>,
     pub disk_paths: Option<Vec<String>>,
     pub config_path: Option<PathBuf>,
@@ -42,6 +45,7 @@ pub fn parse_cli(args: &[String]) -> Result<CliOptions, String> {
         match arg.as_str() {
             "--no-color" => opts.no_color = true,
             "--no-logo" => opts.no_logo = true,
+            "-f" | "--fast" => opts.fast = true,
             "--json" => opts.json = true,
             "--show-empty" => opts.show_empty = true,
             "--completions" => {
@@ -282,6 +286,7 @@ pub fn print_help() {
     println!("    --logo-width <NUM>     Width in terminal cells for image logos");
     println!("    --logo-height <NUM>    Height in terminal cells for image logos");
     println!("    --no-logo              Hide the ASCII distro logo");
+    println!("    -f, --fast             Minimal sfetch-like profile (os/host/kernel/wm/terminal, builtin logo)");
     println!("    --no-color             Disable ANSI terminal colors");
     println!("    --color <MODE>         Color output mode (always, auto, never)");
     println!("    --structure <LIST>     Colon or comma-separated list of modules to display");
@@ -313,6 +318,7 @@ pub fn print_help() {
     println!("    rustfetch --theme nyarch");
     println!("    rustfetch --logo arch");
     println!("    rustfetch --no-logo");
+    println!("    rustfetch --fast");
     println!("    rustfetch --structure title:os:kernel:cpu:gpu:memory:colors");
     println!("    rustfetch --import-fastfetch");
     println!("    rustfetch --import-fastfetch ~/.config/fastfetch/config.jsonc --dry-run");
