@@ -3,7 +3,7 @@ use crate::config::{self, Config, ThemeDef, ThemeEntry, ThemeSource, parse_color
 use crate::info::types::SystemInfo;
 use crate::printer::{render_lines, style_from_theme};
 use crate::utils::visible_width;
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 
@@ -106,17 +106,6 @@ fn stdin_is_tty() -> bool {
 }
 
 #[cfg(unix)]
-fn bytes_available(fd: i32) -> usize {
-    let mut n: libc::c_int = 0;
-    unsafe {
-        if libc::ioctl(fd, libc::FIONREAD, &mut n) != 0 {
-            return 0;
-        }
-    }
-    n.max(0) as usize
-}
-
-#[cfg(unix)]
 struct TerminalGuard {
     fd: i32,
     orig: libc::termios,
@@ -132,7 +121,7 @@ impl TerminalGuard {
                 return Err("tcgetattr failed".into());
             }
             let mut raw = orig;
-            // Disable canonical mode, echo, and ISIG (so Ctrl-C is received as byte 0x03)
+            // Disable canonical mode, echo, and ISIG (Ctrl-C received as byte 0x03)
             raw.c_lflag &= !(libc::ICANON | libc::ECHO | libc::ISIG);
             raw.c_cc[libc::VMIN] = 1;
             raw.c_cc[libc::VTIME] = 0;
@@ -141,13 +130,10 @@ impl TerminalGuard {
             }
 
             let mut out = io::stdout();
-            // Alternate screen buffer, hide cursor, enable mouse tracking:
-            // \x1b[?1000h (VT200 mouse clicks)
-            // \x1b[?1002h (button event reporting, e.g. scroll wheels)
-            // \x1b[?1006h (SGR extended coordinate mode)
+            // Alternate screen buffer, hide cursor, enable mouse click tracking (normal + SGR mode), clear screen
             let _ = write!(
                 out,
-                "\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1002h\x1b[?1006h\x1b[2J\x1b[H"
+                "\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h\x1b[2J\x1b[H"
             );
             let _ = out.flush();
 
@@ -161,7 +147,7 @@ impl Drop for TerminalGuard {
     fn drop(&mut self) {
         let mut out = io::stdout();
         // Disable mouse tracking, restore cursor, leave alternate screen buffer
-        let _ = write!(out, "\x1b[?1006l\x1b[?1002l\x1b[?1000l\x1b[?25h\x1b[?1049l");
+        let _ = write!(out, "\x1b[?1006l\x1b[?1000l\x1b[?25h\x1b[?1049l");
         let _ = out.flush();
         unsafe {
             libc::tcsetattr(self.fd, libc::TCSADRAIN, &self.orig);
@@ -186,97 +172,178 @@ enum Key {
 }
 
 #[cfg(unix)]
-fn read_key() -> Key {
-    let fd = io::stdin().as_raw_fd();
-    let mut buf = [0u8; 1];
-    let stdin = io::stdin();
-    let mut lock = stdin.lock();
-    if lock.read_exact(&mut buf).is_err() {
-        return Key::Other;
+struct RawInput {
+    fd: i32,
+}
+
+#[cfg(unix)]
+impl RawInput {
+    fn new(fd: i32) -> Self {
+        Self { fd }
     }
-    match buf[0] {
-        b'\r' | b'\n' => Key::Enter,
-        b'q' | b'Q' | 0x03 | 0x04 => Key::Quit, // q, Q, Ctrl-C, Ctrl-D
-        b'e' | b'E' => Key::Export,
-        b'k' | b'K' => Key::Up,
-        b'j' | b'J' => Key::Down,
-        b'g' => Key::Home,
-        b'G' => Key::End,
-        0x1b => {
-            if bytes_available(fd) == 0 {
-                return Key::Quit; // standalone Esc
-            }
-            let mut seq = [0u8; 1];
-            if lock.read_exact(&mut seq).is_err() {
-                return Key::Quit;
-            }
-            if seq[0] == b'[' {
-                let mut code = [0u8; 1];
-                if lock.read_exact(&mut code).is_err() {
-                    return Key::Other;
+
+    /// Read a single byte directly from the file descriptor.
+    fn read_byte(&self) -> Option<u8> {
+        let mut b = 0u8;
+        let n = unsafe { libc::read(self.fd, &mut b as *mut u8 as *mut libc::c_void, 1) };
+        if n == 1 { Some(b) } else { None }
+    }
+
+    /// Poll if `fd` is readable within `timeout_ms`.
+    fn poll_readable(&self, timeout_ms: i32) -> bool {
+        let mut pfd = libc::pollfd {
+            fd: self.fd,
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        let ret = unsafe { libc::poll(&mut pfd, 1, timeout_ms) };
+        ret > 0 && (pfd.revents & libc::POLLIN) != 0
+    }
+
+    /// Read next byte if available within `timeout_ms`.
+    fn read_byte_timeout(&self, timeout_ms: i32) -> Option<u8> {
+        if self.poll_readable(timeout_ms) {
+            self.read_byte()
+        } else {
+            None
+        }
+    }
+
+    /// Parse next user key / mouse event.
+    fn next_key(&self) -> Key {
+        let b = match self.read_byte() {
+            Some(b) => b,
+            None => return Key::Other,
+        };
+
+        match b {
+            b'\r' | b'\n' => Key::Enter,
+            b'q' | b'Q' | 0x03 | 0x04 => Key::Quit, // q, Q, Ctrl-C, Ctrl-D
+            b'e' | b'E' => Key::Export,
+            b'k' | b'K' => Key::Up,
+            b'j' | b'J' => Key::Down,
+            b'g' => Key::Home,
+            b'G' => Key::End,
+            0x1b => {
+                // If no following byte arrives within 60ms, it is a standalone Escape key!
+                let b2 = match self.read_byte_timeout(60) {
+                    Some(b2) => b2,
+                    None => return Key::Quit,
+                };
+
+                if b2 == b'[' {
+                    self.parse_csi()
+                } else if b2 == b'O' {
+                    // SS3 sequence used by some terminals for cursor / keypad
+                    let b3 = match self.read_byte_timeout(50) {
+                        Some(b3) => b3,
+                        None => return Key::Other,
+                    };
+                    match b3 {
+                        b'A' => Key::Up,
+                        b'B' => Key::Down,
+                        b'H' => Key::Home,
+                        b'F' => Key::End,
+                        _ => Key::Other,
+                    }
+                } else {
+                    Key::Other
                 }
-                match code[0] {
-                    b'A' => Key::Up,
-                    b'B' => Key::Down,
-                    b'H' => Key::Home,
-                    b'F' => Key::End,
-                    b'5' => {
-                        let mut t = [0u8; 1];
-                        let _ = lock.read_exact(&mut t);
-                        Key::PageUp
-                    }
-                    b'6' => {
-                        let mut t = [0u8; 1];
-                        let _ = lock.read_exact(&mut t);
-                        Key::PageDown
-                    }
-                    b'1' => {
-                        let mut t = [0u8; 1];
-                        let _ = lock.read_exact(&mut t);
-                        Key::Home
-                    }
-                    b'4' => {
-                        let mut t = [0u8; 1];
-                        let _ = lock.read_exact(&mut t);
-                        Key::End
-                    }
-                    b'<' => {
-                        // SGR mouse sequence: \x1b[<btn;x;y(M|m)
-                        let mut mouse_str = String::new();
-                        let mut final_char = 'M';
-                        for _ in 0..40 {
-                            let mut ch = [0u8; 1];
-                            if lock.read_exact(&mut ch).is_err() {
-                                return Key::Other;
-                            }
-                            if ch[0] == b'M' || ch[0] == b'm' {
-                                final_char = ch[0] as char;
-                                break;
-                            }
-                            mouse_str.push(ch[0] as char);
+            }
+            _ => Key::Other,
+        }
+    }
+
+    fn parse_csi(&self) -> Key {
+        let first = match self.read_byte_timeout(50) {
+            Some(f) => f,
+            None => return Key::Other,
+        };
+
+        match first {
+            b'A' => Key::Up,
+            b'B' => Key::Down,
+            b'H' => Key::Home,
+            b'F' => Key::End,
+            b'<' => self.parse_sgr_mouse(),
+            b'M' => self.parse_x10_mouse(),
+            d @ b'0'..=b'9' => {
+                // Numbered sequence: e.g. 5~ (PageUp), 6~ (PageDown), 1~ (Home), 4~ (End)
+                let mut num = (d - b'0') as usize;
+                loop {
+                    match self.read_byte_timeout(50) {
+                        Some(b'~') => break,
+                        Some(next_d @ b'0'..=b'9') => {
+                            num = num * 10 + (next_d - b'0') as usize;
                         }
-                        let parts: Vec<&str> = mouse_str.split(';').collect();
-                        if parts.len() == 3 {
-                            let btn: u32 = parts[0].parse().unwrap_or(0);
-                            let x: usize = parts[1].parse().unwrap_or(1);
-                            let y: usize = parts[2].parse().unwrap_or(1);
-                            if btn == 64 {
-                                return Key::ScrollUp;
-                            } else if btn == 65 {
-                                return Key::ScrollDown;
-                            } else if final_char == 'M' && (btn & 3) == 0 && (btn & 32) == 0 {
-                                return Key::MouseClick { x, y };
-                            }
-                        }
-                        Key::Other
+                        Some(_) | None => return Key::Other,
                     }
+                }
+                match num {
+                    5 => Key::PageUp,
+                    6 => Key::PageDown,
+                    1 | 7 => Key::Home,
+                    4 | 8 => Key::End,
                     _ => Key::Other,
                 }
-            } else {
-                Key::Other
+            }
+            _ => Key::Other,
+        }
+    }
+
+    fn parse_sgr_mouse(&self) -> Key {
+        // SGR format: <btn;x;y(M|m)
+        let mut s = String::new();
+        let mut final_char = 'M';
+        for _ in 0..40 {
+            let ch = match self.read_byte_timeout(50) {
+                Some(ch) => ch,
+                None => return Key::Other,
+            };
+            if ch == b'M' || ch == b'm' {
+                final_char = ch as char;
+                break;
+            }
+            s.push(ch as char);
+        }
+        let parts: Vec<&str> = s.split(';').collect();
+        if parts.len() == 3 {
+            let btn: u32 = parts[0].parse().unwrap_or(0);
+            let x: usize = parts[1].parse().unwrap_or(1);
+            let y: usize = parts[2].parse().unwrap_or(1);
+            if btn == 64 {
+                return Key::ScrollUp;
+            } else if btn == 65 {
+                return Key::ScrollDown;
+            } else if final_char == 'M' && (btn & 3) == 0 && (btn & 32) == 0 {
+                return Key::MouseClick { x, y };
             }
         }
-        _ => Key::Other,
+        Key::Other
+    }
+
+    fn parse_x10_mouse(&self) -> Key {
+        let cb = match self.read_byte_timeout(50) {
+            Some(b) => b.saturating_sub(32),
+            None => return Key::Other,
+        };
+        let cx = match self.read_byte_timeout(50) {
+            Some(b) => (b.saturating_sub(32)) as usize,
+            None => return Key::Other,
+        };
+        let cy = match self.read_byte_timeout(50) {
+            Some(b) => (b.saturating_sub(32)) as usize,
+            None => return Key::Other,
+        };
+        if cb == 64 {
+            Key::ScrollUp
+        } else if cb == 65 {
+            Key::ScrollDown
+        } else if (cb & 3) == 0 && (cb & 32) == 0 {
+            Key::MouseClick { x: cx, y: cy }
+        } else {
+            Key::Other
+        }
     }
 }
 
@@ -661,6 +728,7 @@ pub fn run_setup(
     #[cfg(unix)]
     {
         let _guard = TerminalGuard::enter()?;
+        let input = RawInput::new(_guard.fd);
 
         let active_name = config::active_theme_name(cfg);
         let mut selected = active_name
@@ -682,7 +750,7 @@ pub fn run_setup(
                 logo_override,
             );
 
-            match read_key() {
+            match input.next_key() {
                 Key::Up => {
                     selected = selected.checked_sub(1).unwrap_or(themes.len() - 1);
                     status_msg = None;
@@ -727,9 +795,9 @@ pub fn run_setup(
                     let is_split = cols >= 88;
 
                     // Click on footer buttons (row rows - 1 is shortcut bar, row rows is tip)
-                    if y >= rows.saturating_sub(2) {
-                        if (20..=42).contains(&x) {
-                            // [Click / Enter] Apply & Save
+                    if y >= rows.saturating_sub(1) {
+                        if (15..=29).contains(&x) {
+                            // [Enter] Apply
                             drop(_guard);
                             let chosen = &themes[selected].name;
                             let target = config::save_theme_name(config_path, chosen)?;
@@ -738,8 +806,8 @@ pub fn run_setup(
                                 target.display()
                             );
                             return Ok(());
-                        } else if (43..=54).contains(&x) {
-                            // [e] Export Theme
+                        } else if (30..=41).contains(&x) {
+                            // [e] Export
                             let entry = &themes[selected];
                             let export_name = format!("{}-custom", entry.name);
                             match config::export_theme(config_path, &entry.def, &export_name) {
@@ -756,7 +824,7 @@ pub fn run_setup(
                                     ));
                                 }
                             }
-                        } else if (55..=68).contains(&x) {
+                        } else if (42..=55).contains(&x) {
                             // [q] Quit
                             drop(_guard);
                             println!("Setup closed without saving changes.");
@@ -778,22 +846,8 @@ pub fn run_setup(
                             let row = y - list_start_y;
                             let target_idx = scroll_offset + row;
                             if target_idx < themes.len() {
-                                if target_idx == selected {
-                                    drop(_guard);
-                                    let chosen = &themes[selected].name;
-                                    let target = config::save_theme_name(config_path, chosen)?;
-                                    println!(
-                                        "\x1b[1;32m✓ Theme '{chosen}' successfully applied and saved to {}\x1b[0m",
-                                        target.display()
-                                    );
-                                    return Ok(());
-                                } else {
-                                    selected = target_idx;
-                                    status_msg = Some(format!(
-                                        "\x1b[1;36mPreviewing '{}' (click again or press Enter to apply)\x1b[0m",
-                                        themes[selected].name
-                                    ));
-                                }
+                                selected = target_idx;
+                                status_msg = None;
                             }
                         }
                     } else {
@@ -812,22 +866,8 @@ pub fn run_setup(
                             let row = y - list_start_y;
                             let target_idx = scroll_offset + row;
                             if target_idx < themes.len() {
-                                if target_idx == selected {
-                                    drop(_guard);
-                                    let chosen = &themes[selected].name;
-                                    let target = config::save_theme_name(config_path, chosen)?;
-                                    println!(
-                                        "\x1b[1;32m✓ Theme '{chosen}' successfully applied and saved to {}\x1b[0m",
-                                        target.display()
-                                    );
-                                    return Ok(());
-                                } else {
-                                    selected = target_idx;
-                                    status_msg = Some(format!(
-                                        "\x1b[1;36mPreviewing '{}' (click again or press Enter to apply)\x1b[0m",
-                                        themes[selected].name
-                                    ));
-                                }
+                                selected = target_idx;
+                                status_msg = None;
                             }
                         }
                     }
